@@ -1,8 +1,7 @@
-from pathlib import Path
-
-from fastapi import FastAPI, File, Request, UploadFile
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from pathlib import Path
 
 app = FastAPI(title="TruthLens")
 
@@ -11,9 +10,8 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 @app.post("/analyze", response_class=HTMLResponse)
-async def analyze(request: Request, video: UploadFile = File(...)):
-    # TODO: pipeline integration (Phase 7)
-    return templates.TemplateResponse("result.html", {"request": request, "ai_probability": 0})
+async def analyze(request: Request):
+    return templates.TemplateResponse(request, "result.html", {"ai_probability": 0})
