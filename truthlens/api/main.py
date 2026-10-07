@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Request, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pathlib import Path
+
+from fastapi import FastAPI, File, Request, UploadFile
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 app = FastAPI(title="TruthLens")
 
