@@ -2,13 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>TruthLens</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TruthLens - AI Video Detector</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:2rem;background:#0f172a;color:#e2e8f0}
+    .card{max-width:720px;margin:0 auto;background:#111827;padding:2rem;border-radius:1rem;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+    .btn{background:#4f46e5;color:#fff;padding:.75rem 1rem;border:none;border-radius:.5rem;cursor:pointer}
+  </style>
 </head>
 <body>
-  <h1>TruthLens</h1>
-  <form action="/analyze" method="post" enctype="multipart/form-data">
-    <input type="file" name="video" accept="video/*" required>
-    <button type="submit">Analyze</button>
-  </form>
+  <div class="card">
+    <h1>TruthLens</h1>
+    <p>Multi-signal AI video detection. Upload a video to analyze.</p>
+    <form action="/analyze" method="post" enctype="multipart/form-data">
+      <input type="file" name="video" accept="video/*" required>
+      <button class="btn" type="submit">Analyze</button>
+    </form>
+  </div>
 </body>
 </html>
