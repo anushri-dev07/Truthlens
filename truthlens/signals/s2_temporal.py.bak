@@ -1,0 +1,25 @@
+from __future__ import annotations
+from pathlib import Path
+from typing import List
+
+from .base import SignalScore
+
+
+def score_temporal(video_path: str | Path) -> SignalScore:
+    return SignalScore("s2_temporal", prob_ai=0.5, evidence=["temporal-placeholder"])
+
+
+def score_freq(video_path: str | Path) -> SignalScore:
+    return SignalScore("s3_freq", prob_ai=0.5, evidence=["freq-placeholder"])
+
+
+def score_audio(video_path: str | Path) -> SignalScore:
+    return SignalScore("s4_audio", prob_ai=0.5, evidence=["audio-placeholder"])
+
+
+def score_meta(video_path: str | Path) -> SignalScore:
+    return SignalScore("s5_meta", prob_ai=0.5, evidence=["meta-placeholder"])
+
+
+def score_semantic(video_path: str | Path) -> SignalScore:
+    return SignalScore("s6_semantic", prob_ai=0.5, evidence=["semantic-placeholder"])
