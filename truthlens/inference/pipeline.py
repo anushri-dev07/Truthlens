@@ -20,9 +20,9 @@ def _sigmoid(x: float) -> float:
 
 def fuse_scores(scores: list[dict], weights: dict[str, float] | None = None) -> float:
     weights = weights or {
-        "s1_frame": 0.35,
+        "s1_frame": 0.30,
         "s2_temporal": 0.25,
-        "s3_freq": 0.15,
+        "s3_freq": 0.20,
         "s4_audio": 0.10,
         "s5_meta": 0.10,
         "s6_semantic": 0.05,
@@ -32,7 +32,6 @@ def fuse_scores(scores: list[dict], weights: dict[str, float] | None = None) -> 
         name = s.get("name")
         p = float(s.get("prob_ai", 0.5))
         w = float(weights.get(name or "", 0.0))
-        # map prob to logit approx
         eps = 1e-6
         p_cl = max(eps, min(1 - eps, p))
         logit += w * np.log(p_cl / (1 - p_cl))
