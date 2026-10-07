@@ -21,7 +21,7 @@ async def index(request: Request):
 
 @app.post("/analyze", response_class=HTMLResponse)
 async def analyze(request: Request, video: UploadFile = File(...)):
-    suffix = Path(video.filename or "video.mp4").suffix
+    suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     try:
         shutil.copyfileobj(video.file, tmp)
