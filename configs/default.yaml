@@ -1,0 +1,9 @@
+weights:
+  s1_frame: 0.30
+  s2_temporal: 0.25
+  s3_freq: 0.20
+  s4_audio: 0.10
+  s5_meta: 0.10
+  s6_semantic: 0.05
+sample_frames: 12
+target_fps_sample: 1
