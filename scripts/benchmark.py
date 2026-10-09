@@ -1,9 +1,9 @@
-# Benchmark script to compare baseline vs TruthLens
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
+from truthlens.eval.calibration import expected_calibration_error
 from truthlens.eval.metrics import _accuracy, _auc_roc
 from truthlens.inference.pipeline import run_pipeline
 
@@ -14,7 +14,7 @@ def _pred_video(p: Path) -> float:
 
 
 def main():
-    p = argparse.ArgumentParser(description="TruthLens benchmark")
+    p = argparse.ArgumentParser(description="TruthLens benchmark (with ECE)")
     p.add_argument("--real", nargs="+", required=False)
     p.add_argument("--fake", nargs="+", required=False)
     args = p.parse_args()
@@ -27,11 +27,11 @@ def main():
         y_true.append(1)
         y_pred.append(_pred_video(fp))
     if y_true:
-        out = {
+        print({
             "auc": round(_auc_roc(y_true, y_pred), 4),
             "acc": round(_accuracy(y_true, y_pred), 4),
-        }
-        print(out)
+            "ece": round(expected_calibration_error(y_true, y_pred), 4),
+        })
     else:
         print({"msg": "no videos provided"})
 
