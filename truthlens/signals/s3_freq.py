@@ -17,7 +17,7 @@ def _fft_var(img: np.ndarray) -> float:
     return float(mag.var())
 
 
-def score(video_path: str | Path, sample_frames: int = 4) -> SignalScore:
+def score(video_path: str | Path, sample_frames: int = 2) -> SignalScore:
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         cap.release()

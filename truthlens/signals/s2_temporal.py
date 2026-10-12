@@ -16,7 +16,7 @@ def _fps_dur(cap: cv2.VideoCapture) -> tuple[float, float]:
     return float(fps), float(dur)
 
 
-def score(video_path: str | Path, sample_frames: int = 6) -> SignalScore:
+def score(video_path: str | Path, sample_frames: int = 3) -> SignalScore:
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         cap.release()
@@ -36,7 +36,7 @@ def score(video_path: str | Path, sample_frames: int = 6) -> SignalScore:
             diff = np.abs(gray - prev_gray)
             diff_vars.append(float(diff.var()))
             try:
-                flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 2, 9, 2, 3, 1.2, 0)
+                flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 1, 5, 1, 2, 1.1, 0)
                 mag = np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2)
                 flow_mags.append(float(mag.mean()))
             except Exception:
