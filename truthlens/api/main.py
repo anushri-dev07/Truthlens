@@ -21,7 +21,9 @@ async def index(request: Request):
 
 @app.post("/analyze", response_class=HTMLResponse)
 async def analyze(request: Request, video: UploadFile = File(...)):
-    suffix = Path(video.filename or "video.mp4").suffix or ".mp4"
+    if not video or not video.filename:
+        return templates.TemplateResponse(request, "index.html")
+    suffix = Path(video.filename).suffix or ".mp4"
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     try:
         shutil.copyfileobj(video.file, tmp)
@@ -38,7 +40,7 @@ async def analyze(request: Request, video: UploadFile = File(...)):
         verdict = "Likely AI-generated"
     res["verdict"] = verdict
     res["explanation"] = (
-        "Verdict based on fused evidence: frame, temporal, frequency, audio, metadata, semantic. "
+        "Verdict based on fused evidence (frame, temporal, frequency, audio, metadata, semantic). "
         f"Confidence: {res.get('confidence', 'medium').title()}."
     )
     return templates.TemplateResponse(request, "result.html", res)
