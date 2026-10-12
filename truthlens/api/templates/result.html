@@ -24,21 +24,22 @@
     th,td{padding:.6rem;border-bottom:1px solid var(--border);text-align:left}
     .muted{color:var(--muted)}
     .btn{display:inline-flex;padding:.7rem 1rem;border-radius:.6rem;border:1px solid var(--border);color:var(--text);text-decoration:none;background:linear-gradient(90deg,rgba(34,211,238,.18),rgba(167,139,250,.18))}
+    .verdict{display:inline-flex;padding:.4rem .7rem;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.04)}
   </style>
 </head>
 <body>
   <header><div class="brand"><div class="dot"></div><strong>TruthLens</strong></div></header>
   <main>
     <section class="card">
-      <div class="kpi">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
         <div>
           <h1 class="big">{{ ai_probability }}%</h1>
           <div class="muted">AI Probability</div>
         </div>
-        <div style="flex:1;min-width:240px">
-          <div class="bar"><div class="fill" style="width:{{ ai_probability }}%"></div></div>
-        </div>
+        <div class="verdict">{{ verdict }}</div>
       </div>
+      <div style="margin-top:1rem" class="bar"><div class="fill" style="width:{{ ai_probability }}%"></div></div>
+      <p class="muted" style="margin-top:.75rem">{{ explanation }}</p>
       <a class="btn" href="/">Analyze Another</a>
     </section>
     <section class="card">
