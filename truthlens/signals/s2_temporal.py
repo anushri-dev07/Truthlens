@@ -16,7 +16,7 @@ def _fps_dur(cap: cv2.VideoCapture) -> tuple[float, float]:
     return float(fps), float(dur)
 
 
-def score(video_path: str | Path, sample_frames: int = 20) -> SignalScore:
+def score(video_path: str | Path, sample_frames: int = 6) -> SignalScore:
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         cap.release()
@@ -36,9 +36,7 @@ def score(video_path: str | Path, sample_frames: int = 20) -> SignalScore:
             diff = np.abs(gray - prev_gray)
             diff_vars.append(float(diff.var()))
             try:
-                flow = cv2.calcOpticalFlowFarneback(
-                    prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0
-                )
+                flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 2, 9, 2, 3, 1.2, 0)
                 mag = np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2)
                 flow_mags.append(float(mag.mean()))
             except Exception:
@@ -49,7 +47,6 @@ def score(video_path: str | Path, sample_frames: int = 20) -> SignalScore:
         return SignalScore("s2_temporal", prob_ai=0.5, evidence=["no-temporal-samples"])
     v_flow = float(np.mean(flow_mags)) if flow_mags else 0.0
     v_diff = float(np.mean(diff_vars)) if diff_vars else 0.0
-    # Higher unnatural jitter/warping can create odd flow variance; use normalized heuristic
     p = 1.0 / (1.0 + np.exp(-(v_flow * 0.02 + v_diff * 0.0005 - 1.0)))
     p = float(np.clip(p, 0.1, 0.9))
     evidence = [f"s2_flow_mean={v_flow:.2f}", f"s2_diffvar_mean={v_diff:.2f}"]

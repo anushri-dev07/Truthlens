@@ -17,7 +17,7 @@ def _get_fps_duration(cap: cv2.VideoCapture) -> tuple[float, float]:
     return float(fps), float(duration)
 
 
-def score(video_path: str | Path, sample_frames: int = 12) -> SignalScore:
+def score(video_path: str | Path, sample_frames: int = 4) -> SignalScore:
     clf = FrameClassifier()
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
