@@ -3,10 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import cv2
-import numpy as np
 
+from truthlens.data.faces import extract_faces
 from truthlens.data.video import uniform_sample_indices
-from truthlens.models.frame_clf import FrameClassifier
 from truthlens.signals.base import SignalScore
 
 
@@ -18,23 +17,29 @@ def _get_fps_duration(cap: cv2.VideoCapture) -> tuple[float, float]:
 
 
 def score(video_path: str | Path, sample_frames: int = 2) -> SignalScore:
-    clf = FrameClassifier()
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         cap.release()
         return SignalScore("s1_frame", prob_ai=0.5, evidence=["cannot-open-video"])
     fps, duration = _get_fps_duration(cap)
     idxs = uniform_sample_indices(duration, fps, sample_frames)
-    probs = []
+    crops_count = 0
     for i in idxs:
         cap.set(cv2.CAP_PROP_POS_FRAMES, i)
         ret, frame = cap.read()
         if not ret or frame is None:
             continue
-        p = clf.predict(frame)
-        probs.append(p)
+        faces = extract_faces(frame)
+        crops_count += len(faces)
     cap.release()
-    if not probs:
-        return SignalScore("s1_frame", prob_ai=0.5, evidence=["no-frames-read"])
-    p_mean = float(np.mean(probs))
-    return SignalScore("s1_frame", prob_ai=p_mean, evidence=[f"s1_sampled={len(probs)}"])
+    # simple heuristic: more faces detected -> slightly less "suspicious" for some cases? weak
+    p = 0.5
+    if crops_count == 0:
+        p = 0.55  # no faces found; could be synthetic scene
+    else:
+        p = max(0.3, 0.5 - min(0.2, crops_count * 0.01))
+    return SignalScore(
+        "s1_frame",
+        prob_ai=p,
+        evidence=[f"s1_faces={crops_count}", "s1_faceheuristic"],
+    )
