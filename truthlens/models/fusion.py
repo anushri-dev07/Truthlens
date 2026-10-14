@@ -1,0 +1,67 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+
+
+def _sigmoid(x: float) -> float:
+    return 1.0 / (1.0 + float(np.exp(-x)))
+
+
+def _conf_from_p(p: float) -> str:
+    if p < 0.4:
+        return "low"
+    if p < 0.7:
+        return "medium"
+    return "high"
+
+
+def _extract_vector(scores: list[dict]) -> np.ndarray:
+    order = ["s1_frame", "s2_temporal", "s3_freq", "s4_audio", "s5_meta", "s6_semantic"]
+    return np.array(
+        [float(next((s["prob_ai"] for s in scores if s["name"] == k), 0.5)) for k in order],
+        dtype=float,
+    )
+
+
+class Fusion:
+    def __init__(self, weights: dict[str, float] | None = None, clf_path: Path | None = None):
+        self.weights = weights or {
+            "s1_frame": 0.30,
+            "s2_temporal": 0.25,
+            "s3_freq": 0.20,
+            "s4_audio": 0.10,
+            "s5_meta": 0.10,
+            "s6_semantic": 0.05,
+        }
+        self.clf_path = Path(clf_path) if clf_path else Path("artifacts/models/fusion_lr.pkl")
+        self.clf: LogisticRegression | None = None
+        if self.clf_path.exists():
+            try:
+                import joblib
+
+                self.clf = joblib.load(self.clf_path)
+            except Exception:
+                self.clf = None
+
+    def predict_proba_pct(self, scores: list[dict]) -> float:
+        if self.clf is not None:
+            X = _extract_vector(scores).reshape(1, -1)
+            try:
+                p = float(self.clf.predict_proba(X)[0, 1])
+                return float(np.clip(p * 100.0, 0.0, 100.0))
+            except Exception:
+                pass
+        # fallback to weighted logit
+        order_w = self.weights
+        logit = 0.0
+        for s in scores:
+            name = s.get("name")
+            p = float(s.get("prob_ai", 0.5))
+            w = float(order_w.get(name or "", 0.0))
+            eps = 1e-6
+            p_cl = max(eps, min(1 - eps, p))
+            logit += w * np.log(p_cl / (1 - p_cl))
+        return float(_sigmoid(logit)) * 100.0
