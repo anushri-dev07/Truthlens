@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TruthLens - Batch Results</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: radial-gradient(1200px 800px at 50% -10%, #1f2937, #0b1020); --card: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); --border: rgba(255,255,255,0.12); --text:#e5e7eb; --muted:#9ca3af; }
+    *{box-sizing:border-box;font-family:Inter,system-ui,sans-serif}
+    body{margin:0;background:var(--bg);color:var(--text);min-height:100dvh}
+    header{display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem}
+    .brand{display:flex;gap:.75rem;align-items:center}
+    .dot{width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff,#22d3ee);box-shadow:0 0 40px 6px rgba(34,211,238,.25)}
+    main{max-width:960px;margin:0 auto;padding:2rem;display:grid;gap:1rem}
+    .card{backdrop-filter:blur(12px);background:var(--card);border:1px solid var(--border);border-radius:1rem;padding:clamp(1rem,2vw,2rem)}
+    table{width:100%;border-collapse:collapse;margin-top:1rem}
+    th,td{padding:.6rem;border-bottom:1px solid var(--border);text-align:left;font-size:.92rem}
+    .muted{color:var(--muted)}
+    .btn{display:inline-flex;padding:.45rem .75rem;border-radius:.6rem;border:1px solid var(--border);color:var(--text);text-decoration:none;background:linear-gradient(90deg,rgba(34,211,238,.18),rgba(167,139,250,.18));font-size:.85rem}
+    .v-likely_ai{color:#f87171}.v-likely_real{color:#4ade80}.v-inconclusive{color:#fbbf24}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><div class="dot"></div><strong>TruthLens</strong></div>
+    <div style="display:flex;gap:.5rem">
+      <a class="btn" href="/history">History</a>
+      <a class="btn" href="/">Analyze Another</a>
+    </div>
+  </header>
+  <main>
+    <section class="card">
+      <h1>Batch analysis ({{ count }} files)</h1>
+      <p class="muted">Each file was analyzed independently and saved. Click a row to open its full report.</p>
+      <table>
+        <thead><tr><th>File</th><th>Verdict</th><th>AI %</th><th>Confidence</th><th>Signals</th><th></th></tr></thead>
+        <tbody>
+          {% for r in results %}
+          <tr>
+            <td>{{ r.file.name }}</td>
+            <td class="v-{{ r.verdict }}">{{ r.verdict_text }}</td>
+            <td>{% if r.overall_score is not none %}{{ r.overall_score }}%{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td class="muted">{{ (r.confidence or 'n/a')|title }}</td>
+            <td class="muted">{{ r.signals_analysed }}/{{ r.signals_total }}</td>
+            <td>
+              {% if r.id %}<a class="btn" href="/report/{{ r.id }}">Open</a>
+              <a class="btn" href="/report/{{ r.id }}/pdf">PDF</a>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

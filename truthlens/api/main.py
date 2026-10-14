@@ -22,19 +22,29 @@ async def index(request: Request):
 
 
 @app.post("/analyze", response_class=HTMLResponse)
-async def analyze(request: Request, video: UploadFile = File(...)):
-    if not video or not video.filename:
+async def analyze(request: Request, video: list[UploadFile] = File(...)):
+    uploads = [u for u in (video or []) if u and u.filename]
+    if not uploads:
         return templates.TemplateResponse(request, "index.html")
-    suffix = Path(video.filename).suffix or ".mp4"
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-    try:
-        shutil.copyfileobj(video.file, tmp)
-        tmp.close()
-        res = run_pipeline(tmp.name, filename=video.filename)
-    finally:
-        Path(tmp.name).unlink(missing_ok=True)
-    save_analysis(res)
-    return templates.TemplateResponse(request, "result.html", res)
+
+    results = []
+    for upload in uploads:
+        suffix = Path(upload.filename).suffix or ".mp4"
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        try:
+            shutil.copyfileobj(upload.file, tmp)
+            tmp.close()
+            res = run_pipeline(tmp.name, filename=upload.filename)
+        finally:
+            Path(tmp.name).unlink(missing_ok=True)
+        save_analysis(res)
+        results.append(res)
+
+    if len(results) == 1:
+        return templates.TemplateResponse(request, "result.html", results[0])
+    return templates.TemplateResponse(
+        request, "batch.html", {"results": results, "count": len(results)}
+    )
 
 
 @app.get("/history", response_class=HTMLResponse)

@@ -54,10 +54,11 @@
       <form class="upload" action="/analyze" method="post" enctype="multipart/form-data">
         <div class="dropzone" id="dropzone">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
-          <div><strong>Drop video</strong> or click to upload</div>
-          <div class="subtitle">MP4, WebM, MOV supported</div>
+          <div><strong>Drop videos</strong> or click to upload</div>
+          <div class="subtitle">MP4, WebM, MOV — one file, or several for batch</div>
         </div>
-        <input id="file" type="file" name="video" accept="video/*" required>
+        <input id="file" type="file" name="video" accept="video/*" multiple required>
+        <div id="filelist" class="subtitle"></div>
         <button class="btn" type="submit">Analyze Video</button>
       </form>
     </section>
@@ -83,10 +84,16 @@
   <script>
     const dz = document.getElementById('dropzone');
     const file = document.getElementById('file');
+    const filelist = document.getElementById('filelist');
+    function updateList(){
+      const n = file.files ? file.files.length : 0;
+      filelist.textContent = n ? (n === 1 ? file.files[0].name : n + ' files selected') : '';
+    }
+    file.addEventListener('change', updateList);
     dz.addEventListener('click', ()=>file.click());
     dz.addEventListener('dragover', e=>{e.preventDefault(); dz.style.borderColor='rgba(34,211,238,.8)'});
     dz.addEventListener('dragleave', e=>{e.preventDefault(); dz.style.borderColor='rgba(255,255,255,0.12)'});
-    dz.addEventListener('drop', e=>{e.preventDefault(); dz.style.borderColor='rgba(255,255,255,0.12)'; if(e.dataTransfer.files[0]) file.files=e.dataTransfer.files});
+    dz.addEventListener('drop', e=>{e.preventDefault(); dz.style.borderColor='rgba(255,255,255,0.12)'; if(e.dataTransfer.files[0]){file.files=e.dataTransfer.files; updateList();}});
   </script>
 </body>
 </html>
