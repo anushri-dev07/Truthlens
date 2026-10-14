@@ -18,7 +18,9 @@ def render_pdf(result: dict) -> bytes:
     pdf.cell(0, 12, "TruthLens - Forensic Report", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 6, _safe(f"Generated: {datetime.now().isoformat(timespec='seconds')}"),
+    version = result.get("detector_version", "n/a")
+    generated = result.get("generated_at", datetime.now().isoformat(timespec="seconds"))
+    pdf.cell(0, 6, _safe(f"Detector v{version} · Generated: {generated}"),
              new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
@@ -75,6 +77,14 @@ def render_pdf(result: dict) -> bytes:
         pdf.multi_cell(0, 6, _safe(f"Supporting AI: {supporting}"),
                        new_x="LMARGIN", new_y="NEXT")
         pdf.multi_cell(0, 6, _safe(f"Contradicting: {contradicting}"),
+                       new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+
+    if result.get("disagreement"):
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Cross-signal disagreement", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.multi_cell(0, 6, _safe(result.get("disagreement_note", "")),
                        new_x="LMARGIN", new_y="NEXT")
         pdf.ln(2)
 

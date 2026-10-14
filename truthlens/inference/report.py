@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import UTC, datetime
 from pathlib import Path
+
+DETECTOR_VERSION = "0.1.0"
 
 SIGNAL_LABELS = {
     "s1_frame": "Frame analysis",
@@ -25,6 +28,8 @@ VERDICT_TEXT = {
 AI_THRESHOLD = 70.0
 REAL_THRESHOLD = 30.0
 MIN_SIGNALS_FOR_VERDICT = 2
+STRONG_AI = 65.0
+STRONG_REAL = 35.0
 
 LIMITATIONS = [
     "Automated results are not proof of authenticity; edited, compressed or "
@@ -98,6 +103,21 @@ def build_result(
     contradicting = [s["label"] for s in signals if s["status"] == "completed" and s["score"] <= 40]
     missing = [s["label"] for s in signals if s["status"] != "completed"]
 
+    strong_ai = [
+        s["label"] for s in signals if s["status"] == "completed" and s["score"] >= STRONG_AI
+    ]
+    strong_real = [
+        s["label"] for s in signals if s["status"] == "completed" and s["score"] <= STRONG_REAL
+    ]
+    disagreement = bool(strong_ai and strong_real)
+    disagreement_note = ""
+    if disagreement:
+        disagreement_note = (
+            "Signals disagree: "
+            f"{', '.join(strong_ai)} point to AI, while {', '.join(strong_real)} point to real. "
+            "Treat the verdict with caution — the evidence is mixed."
+        )
+
     timeline = []
     for s in scores:
         if s["name"] == "s1_frame":
@@ -125,6 +145,10 @@ def build_result(
         "supporting": supporting,
         "contradicting": contradicting,
         "missing": missing,
+        "disagreement": disagreement,
+        "disagreement_note": disagreement_note,
         "limitations": limitations,
+        "detector_version": DETECTOR_VERSION,
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "file": file_meta or {},
     }

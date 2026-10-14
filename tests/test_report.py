@@ -35,6 +35,20 @@ def test_build_result_verdicts():
     assert build_result(_scores(), 10.0)["verdict"] == VERDICT_REAL
 
 
+def test_disagreement_detected():
+    from truthlens.inference.report import build_result
+
+    scores = [
+        _sig("s1_frame", 0.9),
+        _sig("s2_temporal", 0.1),
+        _sig("s3_freq", 0.5),
+    ]
+    res = build_result(scores, 45.0)
+    assert res["disagreement"] is True
+    assert "disagree" in res["disagreement_note"].lower()
+    assert res["detector_version"]
+
+
 def test_store_roundtrip():
     from truthlens.inference.report import build_result
     from truthlens.inference.store import get_analysis, save_analysis
