@@ -14,6 +14,13 @@ def _has_tag(fmt: dict, key: str) -> bool:
 def score(video_path: str | Path) -> SignalScore:
     info = probe_video(video_path)
     fmt = info.get("format", {}) if isinstance(info, dict) else {}
+    if not fmt:
+        return SignalScore(
+            "s5_meta",
+            prob_ai=0.5,
+            evidence=["metadata-unavailable"],
+            status="not_available",
+        )
     evidence = []
     if fmt:
         evidence.append(f"nb_streams={fmt.get('nb_streams')}")

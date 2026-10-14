@@ -47,21 +47,27 @@ class Fusion:
                 self.clf = None
 
     def predict_proba_pct(self, scores: list[dict]) -> float:
-        if self.clf is not None:
+        active = [s for s in scores if s.get("status", "completed") == "completed"]
+        if self.clf is not None and len(active) == len(scores):
             X = _extract_vector(scores).reshape(1, -1)
             try:
                 p = float(self.clf.predict_proba(X)[0, 1])
                 return float(np.clip(p * 100.0, 0.0, 100.0))
             except Exception:
                 pass
-        # fallback to weighted logit
-        order_w = self.weights
+        # weighted logit over completed signals only (weights renormalized)
         logit = 0.0
-        for s in scores:
+        total_w = 0.0
+        for s in active:
             name = s.get("name")
+            w = float(self.weights.get(name or "", 0.0))
+            if w <= 0:
+                continue
             p = float(s.get("prob_ai", 0.5))
-            w = float(order_w.get(name or "", 0.0))
             eps = 1e-6
             p_cl = max(eps, min(1 - eps, p))
-            logit += w * np.log(p_cl / (1 - p_cl))
-        return float(_sigmoid(logit)) * 100.0
+            logit += w * float(np.log(p_cl / (1 - p_cl)))
+            total_w += w
+        if total_w <= 0:
+            return 50.0
+        return float(_sigmoid(logit / total_w)) * 100.0

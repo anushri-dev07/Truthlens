@@ -28,19 +28,7 @@ async def analyze(request: Request, video: UploadFile = File(...)):
     try:
         shutil.copyfileobj(video.file, tmp)
         tmp.close()
-        res = run_pipeline(tmp.name)
+        res = run_pipeline(tmp.name, filename=video.filename)
     finally:
         Path(tmp.name).unlink(missing_ok=True)
-    pct = float(res.get("ai_probability", 0))
-    if pct < 30:
-        verdict = "Likely Real"
-    elif pct < 70:
-        verdict = "Uncertain"
-    else:
-        verdict = "Likely AI-generated"
-    res["verdict"] = verdict
-    res["explanation"] = (
-        "Verdict based on fused evidence (frame, temporal, frequency, audio, metadata, semantic). "
-        f"Confidence: {res.get('confidence', 'medium').title()}."
-    )
     return templates.TemplateResponse(request, "result.html", res)

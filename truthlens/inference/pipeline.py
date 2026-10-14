@@ -2,22 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from truthlens.inference.report import build_result, file_info
 from truthlens.models.fusion import Fusion
 from truthlens.signals import s1_frame, s2_temporal, s3_freq, s4_audio, s5_meta, s6_semantic
-
-
-def _conf_from_p(p: float) -> str:
-    if p < 0.4:
-        return "low"
-    if p < 0.7:
-        return "medium"
-    return "high"
-
 
 _fusion = Fusion()
 
 
-def run_pipeline(video_path: str | Path) -> dict:
+def run_pipeline(video_path: str | Path, filename: str | None = None) -> dict:
     s1 = s1_frame.score(video_path).to_dict()
     s2 = s2_temporal.score(video_path).to_dict()
     s3 = s3_freq.score(video_path).to_dict()
@@ -26,10 +18,10 @@ def run_pipeline(video_path: str | Path) -> dict:
     s6 = s6_semantic.score(video_path).to_dict()
     scores = [s1, s2, s3, s4, s5, s6]
     ai_pct = _fusion.predict_proba_pct(scores)
-    p_ai = ai_pct / 100.0
-    confidence = _conf_from_p(p_ai)
-    return {
-        "ai_probability": round(ai_pct, 2),
-        "signals": scores,
-        "confidence": confidence,
-    }
+    res = build_result(scores, ai_pct, file_meta=file_info(video_path, filename))
+    res["explanation"] = (
+        "Verdict based on fused forensic evidence "
+        f"({res['signals_analysed']} of {res['signals_total']} signals ran). "
+        "See per-signal findings and limitations below."
+    )
+    return res

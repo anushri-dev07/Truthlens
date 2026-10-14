@@ -42,19 +42,34 @@ def score(video_path: str | Path) -> SignalScore:
     streams = info.get("streams", []) if isinstance(info, dict) else []
     has_audio = any(s.get("codec_type") == "audio" for s in streams)
     if not has_audio:
-        return SignalScore("s4_audio", prob_ai=0.5, evidence=["no-audio-stream"])
+        return SignalScore(
+            "s4_audio",
+            prob_ai=0.5,
+            evidence=["no-audio-stream"],
+            status="not_available",
+        )
     fd, wav = tempfile.mkstemp(suffix=".wav")
     os.close(fd)
     try:
         ok = _extract_audio(video_path, wav)
         if not ok or not os.path.exists(wav) or os.path.getsize(wav) == 0:
-            return SignalScore("s4_audio", prob_ai=0.5, evidence=["audio-extract-failed"])
+            return SignalScore(
+                "s4_audio",
+                prob_ai=0.5,
+                evidence=["audio-extract-failed"],
+                status="failed",
+            )
         try:
             import librosa
 
             y, sr = librosa.load(wav, sr=16000)
             if len(y) < 512:
-                return SignalScore("s4_audio", prob_ai=0.5, evidence=["audio-too-short"])
+                return SignalScore(
+                    "s4_audio",
+                    prob_ai=0.5,
+                    evidence=["audio-too-short"],
+                    status="not_available",
+                )
             mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
             mfcc_std = float(np.mean(mfcc.std(axis=1)))
             zcr = float(np.mean(librosa.feature.zero_crossing_rate(y=y)))
@@ -68,7 +83,12 @@ def score(video_path: str | Path) -> SignalScore:
             ]
             return SignalScore("s4_audio", prob_ai=p, evidence=evidence)
         except Exception:
-            return SignalScore("s4_audio", prob_ai=0.5, evidence=["librosa-unavailable"])
+            return SignalScore(
+                "s4_audio",
+                prob_ai=0.5,
+                evidence=["librosa-unavailable"],
+                status="not_available",
+            )
     finally:
         try:
             os.unlink(wav)
