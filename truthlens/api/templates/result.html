@@ -46,7 +46,11 @@
 </head>
 <body>
   <header><div class="brand"><div class="dot"></div><strong>TruthLens</strong></div>
-    <a class="btn" href="/">Analyze Another</a></header>
+    <div style="display:flex;gap:.5rem">
+      {% if id %}<a class="btn" href="/report/{{ id }}/pdf">Download PDF</a>{% endif %}
+      <a class="btn" href="/history">History</a>
+      <a class="btn" href="/">Analyze Another</a>
+    </div></header>
   <main>
     <section class="card">
       <div class="kpi">
