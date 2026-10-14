@@ -43,7 +43,7 @@
 <body>
   <header>
     <div class="brand"><div class="dot"></div><strong>TruthLens</strong></div>
-    <nav><a href="#features">Features</a><a href="https://github.com/anomalyco/truthlens" target="_blank" rel="noreferrer">GitHub</a></nav>
+    <nav><a href="#features">Features</a><a href="https://github.com/anomalyco/truthlens" target="_blank" rel="noreferrer">GitHub</a><a href="#how">How it works</a><a href="#signals">Signals</a></nav>
   </header>
   <main>
     <section class="hero">
@@ -61,7 +61,16 @@
         <button class="btn" type="submit">Analyze Video</button>
       </form>
     </section>
-    <section class="features" id="features">
+    <section class="card" id="how">
+      <h2>How it works</h2>
+      <p class="subtitle">TruthLens analyzes multiple forensic signals and fuses them into one clear AI probability with an easy verdict.</p>
+      <div class="features">
+        <article class="feature"><h3>Upload</h3><p>Upload any short/medium video (MP4). Drag & drop supported.</p></article>
+        <article class="feature"><h3>Analyze</h3><p>We sample frames, check audio, extract forensic cues in seconds.</p></article>
+        <article class="feature"><h3>Understand</h3><p>Get AI %, verdict, confidence, and per-signal evidence to explain why.</p></article>
+      </div>
+    </section>
+    <section class="features" id="signals">
       <article class="feature"><h3>Frame Forensics</h3><p>S1 frame-level cues sampled for speed</p></article>
       <article class="feature"><h3>Temporal Consistency</h3><p>S2 motion/flow inconsistencies</p></article>
       <article class="feature"><h3>Frequency Analysis</h3><p>S3 FFT-based texture traces</p></article>
