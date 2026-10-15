@@ -51,7 +51,7 @@
       <p class="subtitle">Multi-signal forensics fused for faster, clearer results</p>
     </section>
     <section class="card">
-      <form class="upload" action="/analyze" method="post" enctype="multipart/form-data">
+      <form class="upload" id="analyzeForm" action="/analyze" method="post" enctype="multipart/form-data">
         <div class="dropzone" id="dropzone">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
           <div><strong>Drop videos</strong> or click to upload</div>
@@ -59,9 +59,17 @@
         </div>
         <input id="file" type="file" name="video" accept="video/*" multiple required>
         <div id="filelist" class="subtitle"></div>
-        <button class="btn" type="submit">Analyze Video</button>
+        <button class="btn" id="submitBtn" type="submit">Analyze Video</button>
       </form>
     </section>
+    <div id="overlay" style="display:none;position:fixed;inset:0;background:rgba(4,8,20,.72);backdrop-filter:blur(4px);z-index:50;place-items:center;text-align:center">
+      <div>
+        <div class="spinner" style="width:54px;height:54px;border:4px solid rgba(255,255,255,.15);border-top-color:#22d3ee;border-radius:50%;margin:0 auto 1rem;animation:spin 1s linear infinite"></div>
+        <div id="overlayText" style="font-size:1.1rem">Analyzing…</div>
+        <div class="subtitle" style="margin-top:.4rem">Running forensic signals — this can take a few seconds.</div>
+      </div>
+    </div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     <section class="card" id="how">
       <h2>How it works</h2>
       <p class="subtitle">TruthLens analyzes multiple forensic signals and fuses them into one clear AI probability with an easy verdict.</p>
@@ -85,11 +93,19 @@
     const dz = document.getElementById('dropzone');
     const file = document.getElementById('file');
     const filelist = document.getElementById('filelist');
+    const form = document.getElementById('analyzeForm');
+    const overlay = document.getElementById('overlay');
+    const overlayText = document.getElementById('overlayText');
     function updateList(){
       const n = file.files ? file.files.length : 0;
       filelist.textContent = n ? (n === 1 ? file.files[0].name : n + ' files selected') : '';
     }
     file.addEventListener('change', updateList);
+    form.addEventListener('submit', ()=>{
+      const n = file.files ? file.files.length : 0;
+      overlayText.textContent = n > 1 ? ('Analyzing ' + n + ' videos…') : 'Analyzing…';
+      overlay.style.display = 'grid';
+    });
     dz.addEventListener('click', ()=>file.click());
     dz.addEventListener('dragover', e=>{e.preventDefault(); dz.style.borderColor='rgba(34,211,238,.8)'});
     dz.addEventListener('dragleave', e=>{e.preventDefault(); dz.style.borderColor='rgba(255,255,255,0.12)'});
