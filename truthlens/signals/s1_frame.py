@@ -4,6 +4,7 @@ from pathlib import Path
 
 import cv2
 
+from truthlens.config import sample_frames as _cfg_sample_frames
 from truthlens.data.faces import extract_faces
 from truthlens.data.video import uniform_sample_indices
 from truthlens.signals.base import SignalScore
@@ -19,7 +20,9 @@ def _fps_duration(cap: cv2.VideoCapture) -> tuple[float, float]:
     return float(fps), float(duration)
 
 
-def score(video_path: str | Path, sample_frames: int = 8) -> SignalScore:
+def score(video_path: str | Path, sample_frames: int | None = None) -> SignalScore:
+    if sample_frames is None:
+        sample_frames = _cfg_sample_frames()
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         cap.release()

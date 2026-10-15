@@ -5,5 +5,19 @@ weights:
   s4_audio: 0.10
   s5_meta: 0.10
   s6_semantic: 0.05
-sample_frames: 12
+
+# frame sampling
+sample_frames: 8
 target_fps_sample: 1
+
+# verdict thresholds (percent). Calibrate with scripts/benchmark.py
+thresholds:
+  ai: 70.0
+  real: 30.0
+  min_signals: 2
+  strong_ai: 65.0
+  strong_real: 35.0
+  stable_delta: 0.15
+
+# optional learned fusion model
+fusion_model: artifacts/models/fusion_lr.pkl

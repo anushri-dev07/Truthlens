@@ -5,6 +5,8 @@ from pathlib import Path
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 
+from truthlens.config import fusion_model_path, weights
+
 
 def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + float(np.exp(-x)))
@@ -27,16 +29,9 @@ def _extract_vector(scores: list[dict]) -> np.ndarray:
 
 
 class Fusion:
-    def __init__(self, weights: dict[str, float] | None = None, clf_path: Path | None = None):
-        self.weights = weights or {
-            "s1_frame": 0.30,
-            "s2_temporal": 0.25,
-            "s3_freq": 0.20,
-            "s4_audio": 0.10,
-            "s5_meta": 0.10,
-            "s6_semantic": 0.05,
-        }
-        self.clf_path = Path(clf_path) if clf_path else Path("artifacts/models/fusion_lr.pkl")
+    def __init__(self, weights_map: dict[str, float] | None = None, clf_path: Path | None = None):
+        self.weights = weights_map or weights()
+        self.clf_path = Path(clf_path) if clf_path else fusion_model_path()
         self.clf: LogisticRegression | None = None
         if self.clf_path.exists():
             try:

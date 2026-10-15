@@ -4,7 +4,9 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-STABLE_DELTA = 0.15
+from truthlens.config import thresholds
+
+STABLE_DELTA = thresholds().get("stable_delta", 0.15)
 
 
 def _variant(src: str | Path, dst: str, scale: float = 1.0) -> bool:

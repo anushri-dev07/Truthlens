@@ -4,6 +4,8 @@ import hashlib
 from datetime import UTC, datetime
 from pathlib import Path
 
+from truthlens.config import thresholds
+
 DETECTOR_VERSION = "0.1.0"
 
 SIGNAL_LABELS = {
@@ -24,12 +26,6 @@ VERDICT_TEXT = {
     VERDICT_REAL: "No strong AI-generation evidence detected",
     VERDICT_INCONCLUSIVE: "Inconclusive — more evidence needed",
 }
-
-AI_THRESHOLD = 70.0
-REAL_THRESHOLD = 30.0
-MIN_SIGNALS_FOR_VERDICT = 2
-STRONG_AI = 65.0
-STRONG_REAL = 35.0
 
 LIMITATIONS = [
     "Automated results are not proof of authenticity; edited, compressed or "
@@ -90,11 +86,18 @@ def build_result(
             }
         )
 
-    if len(completed) < MIN_SIGNALS_FOR_VERDICT:
+    th = thresholds()
+    ai_threshold = float(th.get("ai", 70.0))
+    real_threshold = float(th.get("real", 30.0))
+    min_signals = int(th.get("min_signals", 2))
+    strong_ai_thr = float(th.get("strong_ai", 65.0))
+    strong_real_thr = float(th.get("strong_real", 35.0))
+
+    if len(completed) < min_signals:
         verdict = VERDICT_INCONCLUSIVE
-    elif ai_pct >= AI_THRESHOLD:
+    elif ai_pct >= ai_threshold:
         verdict = VERDICT_AI
-    elif ai_pct <= REAL_THRESHOLD:
+    elif ai_pct <= real_threshold:
         verdict = VERDICT_REAL
     else:
         verdict = VERDICT_INCONCLUSIVE
@@ -104,10 +107,12 @@ def build_result(
     missing = [s["label"] for s in signals if s["status"] != "completed"]
 
     strong_ai = [
-        s["label"] for s in signals if s["status"] == "completed" and s["score"] >= STRONG_AI
+        s["label"] for s in signals if s["status"] == "completed" and s["score"] >= strong_ai_thr
     ]
     strong_real = [
-        s["label"] for s in signals if s["status"] == "completed" and s["score"] <= STRONG_REAL
+        s["label"]
+        for s in signals
+        if s["status"] == "completed" and s["score"] <= strong_real_thr
     ]
     disagreement = bool(strong_ai and strong_real)
     disagreement_note = ""
