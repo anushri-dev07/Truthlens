@@ -1,37 +1,112 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
 
+DEFAULT_MODEL_PATH = Path("artifacts/models/community_forensics/model_int8.onnx")
+DEFAULT_MEAN = [0.485, 0.456, 0.406]
+DEFAULT_STD = [0.229, 0.224, 0.225]
+
+_SESSIONS: dict[str, object] = {}
+
+
+def _softmax(x: np.ndarray) -> np.ndarray:
+    x = x - np.max(x)
+    e = np.exp(x)
+    return e / np.sum(e)
+
+
+def _sigmoid(x: float) -> float:
+    return 1.0 / (1.0 + float(np.exp(-x)))
+
 
 class FrameClassifier:
+    """ONNX image classifier for deepfake detection.
+
+    Supports both 2-logit (softmax) and 1-logit (sigmoid) heads. Preprocessing is
+    read from the sibling ``preprocessor_config.json`` when present.
+    """
+
     def __init__(self, model_path: str | Path | None = None):
-        self.model_path = model_path
+        if model_path is None:
+            try:
+                from truthlens.config import frame_model_path
+
+                model_path = frame_model_path()
+            except Exception:
+                model_path = DEFAULT_MODEL_PATH
+        self.model_path = Path(model_path)
         self.session = None
-        if model_path and Path(model_path).exists():
+        self.cfg = self._load_pre_cfg()
+        key = str(self.model_path)
+        if key in _SESSIONS:
+            self.session = _SESSIONS[key]
+        elif self.model_path.exists():
             try:
                 import onnxruntime as ort
 
-                self.session = ort.InferenceSession(str(model_path))
+                sess = ort.InferenceSession(
+                    str(self.model_path), providers=["CPUExecutionProvider"]
+                )
+                _SESSIONS[key] = sess
+                self.session = sess
             except Exception:
                 self.session = None
 
-    def _preprocess(self, img: np.ndarray) -> np.ndarray:
-        # img HWC RGB 0-255
-        img = img.astype(np.float32) / 255.0
-        img = img.transpose(2, 0, 1)[None, ...]  # NCHW
-        return img
+    def _load_pre_cfg(self) -> dict:
+        p = self.model_path.parent / "preprocessor_config.json"
+        cfg = {}
+        if p.exists():
+            try:
+                cfg = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                cfg = {}
+        size = cfg.get("size") or {}
+        self._size = (
+            int(size.get("width") or size.get("shortest_edge") or 384),
+            int(size.get("height") or size.get("shortest_edge") or 384),
+        )
+        self._crop = int(cfg.get("crop_size") or 0)
+        self._mean = np.array(cfg.get("image_mean") or DEFAULT_MEAN, dtype=np.float32)
+        self._std = np.array(cfg.get("image_std") or DEFAULT_STD, dtype=np.float32)
+        self._rescale = float(cfg.get("rescale_factor") or 1.0 / 255.0)
+        self._resample = int(cfg.get("resample") or 1)
+        return cfg
 
-    def predict(self, img: np.ndarray) -> float:
+    @property
+    def available(self) -> bool:
+        return self.session is not None
+
+    def _preprocess(self, img: np.ndarray) -> np.ndarray:
+        import cv2
+
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        elif img.shape[2] == 4:
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        interp = cv2.INTER_CUBIC if self._resample == 3 else cv2.INTER_LINEAR
+        img = cv2.resize(img, self._size, interpolation=interp)
+        if self._crop and self._crop < img.shape[0]:
+            h, w = img.shape[:2]
+            top = (h - self._crop) // 2
+            left = (w - self._crop) // 2
+            img = img[top: top + self._crop, left: left + self._crop]
+        x = img.astype(np.float32) * self._rescale
+        x = (x - self._mean) / self._std
+        return x.transpose(2, 0, 1)[None, ...]
+
+    def predict(self, img_rgb: np.ndarray) -> float:
+        """Return P(deepfake) for an HWC image (any size)."""
         if not self.session:
             return 0.5
         input_name = self.session.get_inputs()[0].name
-        x = self._preprocess(img)
-        ort_outs = self.session.run(None, {input_name: x})
-        out = ort_outs[0]
-        if out.ndim == 2 and out.shape[1] == 2:
-            p_ai = float(out[0, 1])
-        else:
-            p_ai = float(out.flatten()[0]) if out.size else 0.5
-        return max(0.0, min(1.0, p_ai))
+        x = self._preprocess(img_rgb)
+        out = self.session.run(None, {input_name: x})[0]
+        logits = np.asarray(out, dtype=np.float32).reshape(-1)
+        if logits.size >= 2:
+            probs = _softmax(logits[:2])
+            return float(np.clip(probs[1], 0.0, 1.0))
+        val = float(logits[0]) if logits.size else 0.0
+        return float(np.clip(_sigmoid(val), 0.0, 1.0))

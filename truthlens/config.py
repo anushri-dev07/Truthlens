@@ -24,6 +24,7 @@ _DEFAULTS = {
         "stable_delta": 0.15,
     },
     "fusion_model": "artifacts/models/fusion_lr.pkl",
+    "frame_model": "artifacts/models/community_forensics/model_int8.onnx",
 }
 
 
@@ -71,3 +72,7 @@ def sample_frames() -> int:
 
 def fusion_model_path() -> Path:
     return Path(get_config()["fusion_model"])
+
+
+def frame_model_path() -> Path:
+    return Path(get_config()["frame_model"])

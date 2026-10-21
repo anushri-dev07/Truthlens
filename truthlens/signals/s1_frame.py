@@ -7,10 +7,20 @@ import cv2
 from truthlens.config import sample_frames as _cfg_sample_frames
 from truthlens.data.faces import extract_faces
 from truthlens.data.video import uniform_sample_indices
+from truthlens.models.frame_clf import FrameClassifier
 from truthlens.signals.base import SignalScore
 
 FACE_FOUND_P = 0.4
 NO_FACE_P = 0.6
+
+_clf: FrameClassifier | None = None
+
+
+def _classifier() -> FrameClassifier:
+    global _clf
+    if _clf is None:
+        _clf = FrameClassifier()
+    return _clf
 
 
 def _fps_duration(cap: cv2.VideoCapture) -> tuple[float, float]:
@@ -34,8 +44,12 @@ def score(video_path: str | Path, sample_frames: int | None = None) -> SignalSco
         )
     fps, duration = _fps_duration(cap)
     idxs = uniform_sample_indices(duration, fps, sample_frames)
+    clf = _classifier()
+    use_model = clf.available
     timeline: list[dict] = []
+    frame_probs: list[float] = []
     crops_count = 0
+
     for i in idxs:
         cap.set(cv2.CAP_PROP_POS_FRAMES, i)
         ret, frame = cap.read()
@@ -45,18 +59,21 @@ def score(video_path: str | Path, sample_frames: int | None = None) -> SignalSco
             continue
         faces = extract_faces(frame)
         crops_count += len(faces)
-        p = FACE_FOUND_P if faces else NO_FACE_P
-        timeline.append({"t": t, "score": p, "processed": True})
+        if use_model:
+            if faces:
+                x, y, w, h = max(faces, key=lambda b: b[2] * b[3])
+                crop = frame[y : y + h, x : x + w]
+            else:
+                crop = frame
+            rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+            p = clf.predict(rgb)
+        else:
+            p = FACE_FOUND_P if faces else NO_FACE_P
+        frame_probs.append(p)
+        timeline.append({"t": t, "score": round(p, 4), "processed": True})
+
     cap.release()
-    if not timeline:
-        return SignalScore(
-            "s1_frame",
-            prob_ai=0.5,
-            evidence=["no-frames-sampled"],
-            status="failed",
-        )
-    processed = [f for f in timeline if f["processed"]]
-    if not processed:
+    if not frame_probs:
         return SignalScore(
             "s1_frame",
             prob_ai=0.5,
@@ -64,11 +81,18 @@ def score(video_path: str | Path, sample_frames: int | None = None) -> SignalSco
             status="failed",
             details={"timeline": timeline},
         )
-    p = float(sum(f["score"] for f in processed) / len(processed))
+
+    p = float(sum(frame_probs) / len(frame_probs))
+    method = "cnn_vit" if use_model else "face-heuristic"
+    evidence = [
+        f"s1_method={method}",
+        f"s1_frames={len(frame_probs)}",
+        f"s1_faces={crops_count}",
+    ]
     return SignalScore(
         "s1_frame",
         prob_ai=p,
-        evidence=[f"s1_faces={crops_count}", f"s1_frames={len(processed)}"],
+        evidence=evidence,
         status="completed",
-        details={"timeline": timeline, "faces": crops_count},
+        details={"timeline": timeline, "faces": crops_count, "method": method},
     )

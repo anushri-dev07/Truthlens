@@ -21,3 +21,6 @@ thresholds:
 
 # optional learned fusion model
 fusion_model: artifacts/models/fusion_lr.pkl
+
+# frame-level deepfake classifier (ONNX). Download with: python scripts/download_models.py
+frame_model: artifacts/models/community_forensics/model_int8.onnx
