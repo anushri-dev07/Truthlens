@@ -25,6 +25,7 @@ _DEFAULTS = {
     },
     "fusion_model": "artifacts/models/fusion_lr.pkl",
     "frame_model": "artifacts/models/community_forensics/model_int8.onnx",
+    "probe_dir": "artifacts/models/community_probe",
 }
 
 
@@ -76,3 +77,7 @@ def fusion_model_path() -> Path:
 
 def frame_model_path() -> Path:
     return Path(get_config()["frame_model"])
+
+
+def probe_dir() -> Path:
+    return Path(get_config()["probe_dir"])

@@ -7,21 +7,22 @@ import cv2
 from truthlens.config import sample_frames as _cfg_sample_frames
 from truthlens.data.faces import extract_faces
 from truthlens.data.video import uniform_sample_indices
-from truthlens.models.frame_clf import FrameClassifier
 from truthlens.signals.base import SignalScore
 
 FACE_FOUND_P = 0.4
 NO_FACE_P = 0.6
 
-_clf: FrameClassifier | None = None
+_clf = None
+_clf_method: str | None = None
 
 
-def _classifier() -> FrameClassifier:
-    global _clf
+def _classifier():
+    global _clf, _clf_method
     if _clf is None:
-        _clf = FrameClassifier()
-    return _clf
+        from truthlens.models.frame_clf import get_classifier
 
+        _clf, _clf_method = get_classifier()
+    return _clf, _clf_method
 
 def _fps_duration(cap: cv2.VideoCapture) -> tuple[float, float]:
     fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
@@ -44,8 +45,12 @@ def score(video_path: str | Path, sample_frames: int | None = None) -> SignalSco
         )
     fps, duration = _fps_duration(cap)
     idxs = uniform_sample_indices(duration, fps, sample_frames)
-    clf = _classifier()
+    clf, clf_method = _classifier()
     use_model = clf.available
+    if use_model:
+        method = clf_method or "cnn_vit"
+    else:
+        method = "face-heuristic"
     timeline: list[dict] = []
     frame_probs: list[float] = []
     crops_count = 0
@@ -83,7 +88,6 @@ def score(video_path: str | Path, sample_frames: int | None = None) -> SignalSco
         )
 
     p = float(sum(frame_probs) / len(frame_probs))
-    method = "cnn_vit" if use_model else "face-heuristic"
     evidence = [
         f"s1_method={method}",
         f"s1_frames={len(frame_probs)}",

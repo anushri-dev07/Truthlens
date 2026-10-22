@@ -7,13 +7,13 @@ weights:
   s6_semantic: 0.05
 
 # frame sampling
-sample_frames: 8
+sample_frames: 4
 target_fps_sample: 1
 
-# verdict thresholds (percent). Calibrate with scripts/benchmark.py
+# verdict thresholds (percent). Calibrated on Celeb-DF subset (61 videos)
 thresholds:
-  ai: 70.0
-  real: 30.0
+  ai: 58.0
+  real: 42.0
   min_signals: 2
   strong_ai: 65.0
   strong_real: 35.0
@@ -24,3 +24,7 @@ fusion_model: artifacts/models/fusion_lr.pkl
 
 # frame-level deepfake classifier (ONNX). Download with: python scripts/download_models.py
 frame_model: artifacts/models/community_forensics/model_int8.onnx
+
+# linear probe (embedding ONNX + sklearn head) trained on labelled data.
+# Build with: python scripts/train_probe.py
+probe_dir: artifacts/models/community_probe
