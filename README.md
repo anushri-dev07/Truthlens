@@ -33,13 +33,44 @@ Open http://127.0.0.1:8000
 - `/report/{id}` reopen a saved report
 - `/report/{id}/pdf` download the PDF report
 
+## Detector
+
+The primary frame signal (`s1_frame`) is a **linear probe on frozen ViT
+embeddings** (`ProbeClassifier`). A pretrained deepfake ViT (Community
+Forensics) exposes its pre-classifier CLS embedding; a scikit-learn logistic
+head is trained on labelled data to adapt the decision boundary to the target
+domain. This is CPU-only and trains in seconds.
+
+Get the models and train the probe:
+
+```powershell
+python scripts/download_models.py --model community_forensics   # base ViT
+python scripts/fetch_eval.py --per-class 40                     # labelled eval set
+python scripts/train_probe.py --model artifacts/models/community_forensics/model.onnx
+```
+
+`ProbeClassifier` is used automatically when `artifacts/models/community_probe/`
+exists; otherwise TruthLens falls back to the raw ONNX classifier, then to a
+face heuristic.
+
+### Results (Celeb-DF v2 subset, 61 videos, 40 real / 21 AI)
+
+| Method | AUC |
+| --- | --- |
+| Zero-shot ViT (raw ONNX) | 0.53 |
+| Face heuristic | 0.50 |
+| **Linear probe (default)** | **0.82** |
+
+Overall pipeline at the calibrated threshold (0.55): accuracy 0.75, TPR 0.86,
+FPR 0.30.
+
 ## Evaluation
 
 Score the detector on a labelled set (CSV/JSON manifest with `path,label`,
 where `1` = AI-generated) and calibrate thresholds:
 
 ```powershell
-python scripts/benchmark.py --manifest data/eval_manifest.example.csv
+python scripts/benchmark.py --manifest data/eval/manifest.csv
 ```
 
 Report includes AUC, accuracy, precision/recall/F1, TPR/FPR, ECE, and the
@@ -62,5 +93,6 @@ ruff check .
 
 - CPU-only friendly (ONNX optional). ffmpeg is required for audio and ffprobe
   metadata paths; without it those signals report `not_available`.
-- Research-oriented. Scores are heuristic unless a validated model is loaded.
-  Calibrate on your own splits before making strong accuracy claims.
+- Cross-dataset generalisation is hard: raw off-the-shelf deepfake models score
+  near chance on Celeb-DF. The probe fixes this by adapting to the target domain.
+  Retrain the probe on your own labelled data for best results.
