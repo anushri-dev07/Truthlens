@@ -7,7 +7,7 @@ weights:
   s6_semantic: 0.05
 
 # frame sampling
-sample_frames: 4
+sample_frames: 2
 target_fps_sample: 1
 
 # verdict thresholds (percent). Calibrated on Celeb-DF subset (61 videos)

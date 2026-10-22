@@ -11,15 +11,21 @@ from truthlens.signals.base import SignalScore
 
 def _fft_var(img: np.ndarray) -> float:
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.resize(gray, (480, 270), interpolation=cv2.INTER_AREA)
     f = np.fft.fft2(gray)
     fshift = np.fft.fftshift(f)
     mag = np.log1p(np.abs(fshift))
     return float(mag.var())
 
 
-def _dct_var(block: np.ndarray) -> float:
-    b = np.fft.fft(block.astype(np.float32))
-    return float(np.abs(b).var())
+def _block_var(gray: np.ndarray, block: int = 8) -> float:
+    h, w = gray.shape
+    h2, w2 = (h // block) * block, (w // block) * block
+    g = gray[:h2, :w2].astype(np.float32)
+    blocks = g.reshape(h2 // block, block, w2 // block, block).transpose(0, 2, 1, 3)
+    blocks = blocks.reshape(-1, block * block)
+    dct = np.abs(np.fft.fft(blocks, axis=1))
+    return float(dct.var())
 
 
 def score(video_path: str | Path, sample_frames: int = 2) -> SignalScore:
@@ -40,11 +46,7 @@ def score(video_path: str | Path, sample_frames: int = 2) -> SignalScore:
             continue
         vars_fft.append(_fft_var(frame))
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        h, w = gray.shape
-        bh, bw = 8, 8
-        for r in range(0, h - bh, bh):
-            for c in range(0, w - bw, bw):
-                vars_dct.append(_dct_var(gray[r : r + bh, c : c + bw]))
+        vars_dct.append(_block_var(gray))
     cap.release()
     if not vars_fft:
         return SignalScore("s3_freq", prob_ai=0.5, evidence=["no-frames"])
