@@ -31,15 +31,35 @@ def render_pdf(result: dict) -> bytes:
              new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 11)
     score_txt = f"{overall}%" if overall is not None else "not produced (inconclusive)"
-    pdf.cell(0, 6, _safe(f"AI probability: {score_txt}"), new_x="LMARGIN", new_y="NEXT")
-    conf = result.get("confidence") or "n/a"
-    pdf.cell(0, 6, _safe(f"Confidence: {conf}"), new_x="LMARGIN", new_y="NEXT")
+    score_label = result.get("score_label", "AI-generation detection score")
+    pdf.cell(0, 6, _safe(f"{score_label}: {score_txt}"), new_x="LMARGIN", new_y="NEXT")
+    separation = result.get("score_separation") or "n/a"
+    pdf.cell(
+        0,
+        6,
+        _safe(f"Distance from neutral score: {separation}"),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
     pdf.cell(
         0, 6,
-        _safe(f"Signals analysed: {result.get('signals_analysed')}"
+        _safe(f"Checks completed: {result.get('signals_analysed')}"
               f" / {result.get('signals_total')}"),
         new_x="LMARGIN", new_y="NEXT",
     )
+    meaning = result.get("verdict_meaning")
+    if meaning:
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(110, 110, 110)
+        pdf.multi_cell(0, 5, _safe(meaning), new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(0, 0, 0)
+    note = result.get("score_note")
+    if note:
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(110, 110, 110)
+        pdf.multi_cell(0, 5, _safe(note), new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "", 11)
     pdf.ln(4)
 
     file_meta = result.get("file", {}) or {}
@@ -56,17 +76,94 @@ def render_pdf(result: dict) -> bytes:
     pdf.ln(4)
 
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "Signal findings", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, "Forensic findings", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 10)
-    for s in result.get("signals", []):
-        score = f"{s['score']}%" if s.get("status") == "completed" else "-"
-        findings = ", ".join(s.get("evidence") or [])
+    for f in result.get("findings", []):
+        pdf.set_font("Helvetica", "B", 10)
         pdf.multi_cell(
-            0, 6,
-            _safe(f"[{s.get('status')}] {s.get('label')}: {score} | {findings}"),
+            0, 5,
+            _safe(f"{f.get('label', '')} [{f.get('status', '')}]"),
             new_x="LMARGIN", new_y="NEXT",
         )
+        pdf.set_font("Helvetica", "", 9)
+        measures = f.get("measures")
+        if measures:
+            pdf.multi_cell(0, 5, _safe(f"Measures: {measures}"), new_x="LMARGIN", new_y="NEXT")
+        summary = f.get("summary")
+        if summary:
+            pdf.multi_cell(0, 5, _safe(summary), new_x="LMARGIN", new_y="NEXT")
+        for fd in f.get("findings", []):
+            direction = fd.get("direction", "")
+            direction_txt = "" if direction == "no_effect" else f" [{direction.replace('_', ' ')}]"
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.multi_cell(
+                0, 5,
+                _safe(f"{fd.get('title', '')}: {fd.get('measured', '')}{direction_txt}"),
+                new_x="LMARGIN", new_y="NEXT",
+            )
+            pdf.set_font("Helvetica", "", 9)
+            if fd.get("unit"):
+                pdf.multi_cell(0, 4, _safe(f"Unit: {fd['unit']}"), new_x="LMARGIN", new_y="NEXT")
+            if fd.get("interpretation"):
+                pdf.multi_cell(
+                    0, 4, _safe(f"Interpretation: {fd['interpretation']}"),
+                    new_x="LMARGIN", new_y="NEXT",
+                )
+            if fd.get("limitation"):
+                pdf.set_text_color(110, 110, 110)
+                pdf.multi_cell(
+                    0, 4, _safe(f"Limitation: {fd['limitation']}"),
+                    new_x="LMARGIN", new_y="NEXT",
+                )
+                pdf.set_text_color(0, 0, 0)
+        raw = f.get("raw_evidence") or []
+        if raw:
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(130, 130, 130)
+            pdf.multi_cell(
+                0, 4, _safe("Raw measurements: " + ", ".join(raw)),
+                new_x="LMARGIN", new_y="NEXT",
+            )
+            pdf.set_text_color(0, 0, 0)
+        pdf.ln(2)
     pdf.ln(2)
+
+    timeline = result.get("timeline") or []
+    if timeline:
+        meta = result.get("timeline_meta") or {}
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Evidence timeline", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 10)
+        duration = meta.get("duration_sec")
+        interval = meta.get("interval_sec")
+        header = (
+            f"{meta.get('scored_frames', len(timeline))} frame(s) sampled"
+        )
+        if duration:
+            header += f" from a {duration}s video"
+        if interval is not None:
+            header += f", sampling interval about {interval}s"
+        pdf.multi_cell(0, 5, _safe(header), new_x="LMARGIN", new_y="NEXT")
+        for f in timeline:
+            score = f.get("score")
+            processed = f.get("processed")
+            score_txt = f"{(score or 0) * 100:.1f}%" if processed else "not scored"
+            frame_no = f.get("frame")
+            frame_txt = f", frame {frame_no}" if frame_no is not None else ""
+            pdf.multi_cell(
+                0, 5,
+                _safe(f"- t={f.get('t')}s{frame_txt}: classifier score {score_txt}"),
+                new_x="LMARGIN", new_y="NEXT",
+            )
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(130, 130, 130)
+        pdf.multi_cell(
+            0, 4,
+            _safe("Frame previews are available in the interactive web report."),
+            new_x="LMARGIN", new_y="NEXT",
+        )
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(2)
 
     if result.get("supporting") or result.get("contradicting"):
         pdf.set_font("Helvetica", "B", 12)

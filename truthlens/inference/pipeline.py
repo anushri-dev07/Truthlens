@@ -21,7 +21,8 @@ def run_pipeline(video_path: str | Path, filename: str | None = None) -> dict:
     res = build_result(scores, ai_pct, file_meta=file_info(video_path, filename))
     res["explanation"] = (
         "Verdict based on fused forensic evidence "
-        f"({res['signals_analysed']} of {res['signals_total']} signals ran). "
-        "See per-signal findings and limitations below."
+        f"({res['signals_analysed']} of {res['signals_total']} checks ran). "
+        "The headline number is a detection score, not a calibrated "
+        "probability. See per-check findings and limitations below."
     )
     return res

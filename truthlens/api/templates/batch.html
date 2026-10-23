@@ -32,21 +32,25 @@
   <main>
     <section class="card">
       <h1>Batch analysis ({{ count }} files)</h1>
-      <p class="muted">Each file was analyzed independently and saved. Click a row to open its full report.</p>
+      <p class="muted">Files were processed independently. Successful reports are saved; any failures are shown below.</p>
       <table>
-        <thead><tr><th>File</th><th>Verdict</th><th>AI %</th><th>Confidence</th><th>Signals</th><th></th></tr></thead>
+        <thead><tr><th>File</th><th>Verdict</th><th>Detection score</th><th>Score separation</th><th>Checks</th><th></th></tr></thead>
         <tbody>
           {% for r in results %}
           <tr>
             <td>{{ r.file.name }}</td>
+            {% if r.error %}
+            <td colspan="5" role="alert">{{ r.error }}</td>
+            {% else %}
             <td class="v-{{ r.verdict }}">{{ r.verdict_text }}</td>
             <td>{% if r.overall_score is not none %}{{ r.overall_score }}%{% else %}<span class="muted">—</span>{% endif %}</td>
-            <td class="muted">{{ (r.confidence or 'n/a')|title }}</td>
+            <td class="muted">{{ (r.score_separation or 'n/a')|title }}</td>
             <td class="muted">{{ r.signals_analysed }}/{{ r.signals_total }}</td>
             <td>
               {% if r.id %}<a class="btn" href="/report/{{ r.id }}">Open</a>
               <a class="btn" href="/report/{{ r.id }}/pdf">PDF</a>{% endif %}
             </td>
+            {% endif %}
           </tr>
           {% endfor %}
         </tbody>

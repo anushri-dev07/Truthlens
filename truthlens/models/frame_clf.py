@@ -14,6 +14,53 @@ _SESSIONS: dict[str, object] = {}
 _HEADS: dict[str, object] = {}
 
 
+class ImagePreprocessor:
+    """Apply the model's configured resize, crop, rescale, and normalization."""
+
+    def __init__(
+        self,
+        config_path: str | Path | None = None,
+        fallback_size: tuple[int, int] = (384, 384),
+    ):
+        self.cfg = {}
+        if config_path is not None and Path(config_path).exists():
+            try:
+                self.cfg = json.loads(Path(config_path).read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError(f"Invalid image preprocessor config: {config_path}") from exc
+            if not isinstance(self.cfg, dict):
+                raise ValueError(f"Image preprocessor config must be an object: {config_path}")
+
+        size = self.cfg.get("size") or {}
+        self.size = (
+            int(size.get("width") or size.get("shortest_edge") or fallback_size[0]),
+            int(size.get("height") or size.get("shortest_edge") or fallback_size[1]),
+        )
+        self.crop = int(self.cfg.get("crop_size") or 0)
+        self.mean = np.array(self.cfg.get("image_mean") or DEFAULT_MEAN, dtype=np.float32)
+        self.std = np.array(self.cfg.get("image_std") or DEFAULT_STD, dtype=np.float32)
+        self.rescale = float(self.cfg.get("rescale_factor") or 1.0 / 255.0)
+        self.resample = int(self.cfg.get("resample") or 1)
+
+    def __call__(self, img: np.ndarray) -> np.ndarray:
+        import cv2
+
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        elif img.shape[2] == 4:
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        interp = cv2.INTER_CUBIC if self.resample == 3 else cv2.INTER_LINEAR
+        img = cv2.resize(img, self.size, interpolation=interp)
+        if self.crop and self.crop < img.shape[0]:
+            h, w = img.shape[:2]
+            top = (h - self.crop) // 2
+            left = (w - self.crop) // 2
+            img = img[top : top + self.crop, left : left + self.crop]
+        x = img.astype(np.float32) * self.rescale
+        x = (x - self.mean) / self.std
+        return x.transpose(2, 0, 1)[None, ...]
+
+
 def _run_session(session, x: np.ndarray) -> list:
     input_name = session.get_inputs()[0].name
     return session.run(None, {input_name: x})
@@ -46,7 +93,10 @@ class FrameClassifier:
                 model_path = DEFAULT_MODEL_PATH
         self.model_path = Path(model_path)
         self.session = None
-        self.cfg = self._load_pre_cfg()
+        self.preprocessor = ImagePreprocessor(
+            self.model_path.parent / "preprocessor_config.json"
+        )
+        self.cfg = self.preprocessor.cfg
         key = str(self.model_path)
         if key in _SESSIONS:
             self.session = _SESSIONS[key]
@@ -62,47 +112,12 @@ class FrameClassifier:
             except Exception:
                 self.session = None
 
-    def _load_pre_cfg(self) -> dict:
-        p = self.model_path.parent / "preprocessor_config.json"
-        cfg = {}
-        if p.exists():
-            try:
-                cfg = json.loads(p.read_text(encoding="utf-8"))
-            except Exception:
-                cfg = {}
-        size = cfg.get("size") or {}
-        self._size = (
-            int(size.get("width") or size.get("shortest_edge") or 384),
-            int(size.get("height") or size.get("shortest_edge") or 384),
-        )
-        self._crop = int(cfg.get("crop_size") or 0)
-        self._mean = np.array(cfg.get("image_mean") or DEFAULT_MEAN, dtype=np.float32)
-        self._std = np.array(cfg.get("image_std") or DEFAULT_STD, dtype=np.float32)
-        self._rescale = float(cfg.get("rescale_factor") or 1.0 / 255.0)
-        self._resample = int(cfg.get("resample") or 1)
-        return cfg
-
     @property
     def available(self) -> bool:
         return self.session is not None
 
     def _preprocess(self, img: np.ndarray) -> np.ndarray:
-        import cv2
-
-        if img.ndim == 2:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-        elif img.shape[2] == 4:
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        interp = cv2.INTER_CUBIC if self._resample == 3 else cv2.INTER_LINEAR
-        img = cv2.resize(img, self._size, interpolation=interp)
-        if self._crop and self._crop < img.shape[0]:
-            h, w = img.shape[:2]
-            top = (h - self._crop) // 2
-            left = (w - self._crop) // 2
-            img = img[top: top + self._crop, left: left + self._crop]
-        x = img.astype(np.float32) * self._rescale
-        x = (x - self._mean) / self._std
-        return x.transpose(2, 0, 1)[None, ...]
+        return self.preprocessor(img)
 
     def predict(self, img_rgb: np.ndarray) -> float:
         """Return P(deepfake) for an HWC image (any size)."""

@@ -35,6 +35,16 @@ def test_build_result_verdicts():
     assert build_result(_scores(), 10.0)["verdict"] == VERDICT_REAL
 
 
+def test_result_labels_separation_not_confidence():
+    from truthlens.inference.report import build_result
+
+    result = build_result(_scores(), 85.0)
+
+    assert result["score_separation"] == "high"
+    assert "confidence" not in result
+    assert "not the probability" in result["score_note"]
+
+
 def test_disagreement_detected():
     from truthlens.inference.report import build_result
 

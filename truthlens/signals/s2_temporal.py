@@ -20,17 +20,32 @@ def score(video_path: str | Path, sample_frames: int = 3) -> SignalScore:
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         cap.release()
-        return SignalScore("s2_temporal", prob_ai=0.5, evidence=["cannot-open-video"])
+        return SignalScore(
+            "s2_temporal",
+            prob_ai=0.5,
+            evidence=["cannot-open-video"],
+            status="failed",
+        )
     fps, dur = _fps_dur(cap)
     idxs = uniform_sample_indices(dur, fps, sample_frames)
+    if not idxs:
+        cap.release()
+        return SignalScore(
+            "s2_temporal",
+            prob_ai=0.5,
+            evidence=["no-sample-indices"],
+            status="not_available",
+        )
     flow_mags: list[float] = []
     diff_vars: list[float] = []
     prev_gray = None
+    decoded_frames = 0
     for i in idxs:
         cap.set(cv2.CAP_PROP_POS_FRAMES, i)
         ret, frame = cap.read()
         if not ret or frame is None:
             continue
+        decoded_frames += 1
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
         if prev_gray is not None:
             diff = np.abs(gray - prev_gray)
@@ -44,7 +59,11 @@ def score(video_path: str | Path, sample_frames: int = 3) -> SignalScore:
         prev_gray = gray
     cap.release()
     if not flow_mags and not diff_vars:
-        return SignalScore("s2_temporal", prob_ai=0.5, evidence=["no-temporal-samples"])
+        evidence = ["no-readable-frames"] if decoded_frames == 0 else ["no-temporal-pairs"]
+        status = "failed" if decoded_frames == 0 else "not_available"
+        return SignalScore(
+            "s2_temporal", prob_ai=0.5, evidence=evidence, status=status
+        )
     v_flow = float(np.mean(flow_mags)) if flow_mags else 0.0
     v_diff = float(np.mean(diff_vars)) if diff_vars else 0.0
     p = 1.0 / (1.0 + np.exp(-(v_flow * 0.02 + v_diff * 0.0005 - 1.0)))

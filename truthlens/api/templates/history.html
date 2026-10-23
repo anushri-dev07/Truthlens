@@ -33,7 +33,7 @@
       <p class="muted">Previous analyses are stored locally (SQLite). Click a row to reopen its report.</p>
       {% if records %}
       <table>
-        <thead><tr><th>File</th><th>Verdict</th><th>AI %</th><th>When</th><th>SHA-256</th><th></th></tr></thead>
+        <thead><tr><th>File</th><th>Verdict</th><th>Detection score</th><th>When</th><th>SHA-256</th><th></th></tr></thead>
         <tbody>
           {% for r in records %}
           <tr>

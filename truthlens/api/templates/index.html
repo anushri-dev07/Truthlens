@@ -37,6 +37,7 @@
     .feature { border: 1px solid var(--border); border-radius: .75rem; padding: 1rem; background: rgba(255,255,255,0.02); }
     .feature h3 { margin: .25rem 0; }
     .feature p { margin: 0; color: var(--muted); font-size: .95rem; }
+    .error { border: 1px solid rgba(248,113,113,.55); background: rgba(239,68,68,.12); border-radius: .65rem; padding: .85rem 1rem; color: #fecaca; }
     footer { text-align: center; color: var(--muted); padding: 2rem; }
   </style>
 </head>
@@ -47,17 +48,18 @@
   </header>
   <main>
     <section class="hero">
-      <h1 class="title">Detect AI-generated videos</h1>
-      <p class="subtitle">Multi-signal forensics fused for faster, clearer results</p>
+      <h1 class="title">Explore video forensic signals</h1>
+      <p class="subtitle">An experimental screening tool that summarizes sampled evidence—not a proof of authenticity.</p>
     </section>
     <section class="card">
       <form class="upload" id="analyzeForm" action="/analyze" method="post" enctype="multipart/form-data">
+        {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
         <div class="dropzone" id="dropzone">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
           <div><strong>Drop videos</strong> or click to upload</div>
-          <div class="subtitle">MP4, WebM, MOV — one file, or several for batch</div>
+          <div class="subtitle">MP4, WebM, MOV · Up to 100 MiB per video · Up to 5 videos per batch (250 MiB total)</div>
         </div>
-        <input id="file" type="file" name="video" accept="video/*" multiple required>
+        <input id="file" type="file" name="video" accept=".mp4,.webm,.mov" multiple required>
         <div id="filelist" class="subtitle"></div>
         <button class="btn" id="submitBtn" type="submit">Analyze Video</button>
       </form>
@@ -72,23 +74,23 @@
     <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     <section class="card" id="how">
       <h2>How it works</h2>
-      <p class="subtitle">TruthLens analyzes multiple forensic signals and fuses them into one clear AI probability with an easy verdict.</p>
+      <p class="subtitle">TruthLens samples frames and combines available forensic checks into an uncalibrated detection score and a cautious verdict. The score is not the probability that a video is AI-generated.</p>
       <div class="features">
-        <article class="feature"><h3>Upload</h3><p>Upload any short/medium video (MP4). Drag & drop supported.</p></article>
-        <article class="feature"><h3>Analyze</h3><p>We sample frames, check audio, extract forensic cues in seconds.</p></article>
-        <article class="feature"><h3>Understand</h3><p>Get AI %, verdict, confidence, and per-signal evidence to explain why.</p></article>
+        <article class="feature"><h3>Upload</h3><p>Upload MP4, WebM, or MOV. Each file may be up to 100 MiB; batches allow up to 5 files and 250 MiB total.</p></article>
+        <article class="feature"><h3>Analyze</h3><p>Inspect sampled frames, frame-to-frame motion, spatial-frequency statistics, audio features, and container metadata where available.</p></article>
+        <article class="feature"><h3>Understand</h3><p>Review the detection score, cautious verdict, checks that ran, raw measurements, and known limitations.</p></article>
       </div>
     </section>
     <section class="features" id="signals">
-      <article class="feature"><h3>Frame Forensics</h3><p>S1 frame-level cues sampled for speed</p></article>
-      <article class="feature"><h3>Temporal Consistency</h3><p>S2 motion/flow inconsistencies</p></article>
-      <article class="feature"><h3>Frequency Analysis</h3><p>S3 FFT-based texture traces</p></article>
-      <article class="feature"><h3>Audio &amp; AV</h3><p>S4 stream presence + future AV checks</p></article>
-      <article class="feature"><h3>Metadata</h3><p>S5 container/encoder heuristics</p></article>
-      <article class="feature"><h3>Semantic Cues</h3><p>S6 contextual plausibility</p></article>
+      <article class="feature"><h3>Sampled-frame analysis</h3><p>A frame model may run when its assets load; otherwise the app falls back to a face-presence heuristic, which is not a manipulation detector.</p></article>
+      <article class="feature"><h3>Temporal statistics</h3><p>Optical-flow magnitude and frame-difference variance; experimental hand-tuned values without validated directional thresholds.</p></article>
+      <article class="feature"><h3>Spatial-frequency statistics</h3><p>FFT-based image measurements; experimental and sensitive to resizing, compression, and camera noise.</p></article>
+      <article class="feature"><h3>Audio features</h3><p>MFCC, zero-crossing-rate, and spectral-flatness statistics when audio tools and a track are available. No AV synchronization check.</p></article>
+      <article class="feature"><h3>Container metadata</h3><p>A weak rule based on metadata tags; tags may be absent from ordinary re-encoded videos.</p></article>
+      <article class="feature"><h3>Semantic check</h3><p>Not implemented; reported as unavailable and excluded from the verdict.</p></article>
     </section>
   </main>
-  <footer>CPU-friendly • Evidence-based breakdown</footer>
+  <footer>Experimental screening only • Results can be wrong and are not proof of authenticity</footer>
   <script>
     const dz = document.getElementById('dropzone');
     const file = document.getElementById('file');
