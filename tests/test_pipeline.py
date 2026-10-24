@@ -59,3 +59,45 @@ def test_pipeline_reuses_one_shared_visual_sample(monkeypatch):
 
     assert result["signals_total"] == 6
     assert calls == {"decode": 1, "shared": 3}
+
+
+def test_pipeline_logs_stage_timings(monkeypatch, caplog):
+    from truthlens.inference import pipeline
+    from truthlens.signals.base import SignalScore
+
+    sampled = {"fps": 24.0, "duration": 1.0, "total_frames": 24, "frames": {}}
+    signal_names = (
+        "s1_frame",
+        "s2_temporal",
+        "s3_freq",
+        "s4_audio",
+        "s5_meta",
+        "s6_semantic",
+    )
+    monkeypatch.setattr(pipeline, "read_sampled_frames", lambda *_args: sampled)
+    monkeypatch.setattr(pipeline, "configured_sample_frames", lambda: 2)
+    for name in signal_names[:3]:
+        monkeypatch.setattr(
+            getattr(pipeline, name.split("_")[0] + "_" + name.split("_")[1]),
+            "score",
+            lambda *_args, _name=name, **_kwargs: SignalScore(
+                _name, 0.5, evidence=[], status="not_available"
+            ),
+        )
+    for name in signal_names[3:]:
+        module = getattr(pipeline, name.split("_")[0] + "_" + name.split("_")[1])
+        monkeypatch.setattr(
+            module,
+            "score",
+            lambda *_args, _name=name: SignalScore(
+                _name, 0.5, evidence=[], status="not_available"
+            ),
+        )
+
+    with caplog.at_level("INFO", logger="truthlens.inference.pipeline"):
+        pipeline.run_pipeline("timed.mp4")
+
+    messages = "\n".join(record.message for record in caplog.records)
+    assert "analysis_stage name=shared_decode" in messages
+    assert "analysis_stage name=s1_frame" in messages
+    assert "analysis_stage name=pipeline_total" in messages
