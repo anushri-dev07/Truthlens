@@ -28,22 +28,30 @@ def _block_var(gray: np.ndarray, block: int = 8) -> float:
     return float(fft_magnitudes.var())
 
 
-def score(video_path: str | Path, sample_frames: int = 2) -> SignalScore:
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        cap.release()
-        return SignalScore(
-            "s3_freq",
-            prob_ai=0.5,
-            evidence=["cannot-open-video"],
-            status="failed",
-        )
-    fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
-    total = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0
-    dur = total / fps if fps > 0 else 0.0
+def score(
+    video_path: str | Path, sample_frames: int = 2, sampled: dict | None = None
+) -> SignalScore:
+    cap = None
+    if sampled is None:
+        cap = cv2.VideoCapture(str(video_path))
+        if not cap.isOpened():
+            cap.release()
+            return SignalScore(
+                "s3_freq",
+                prob_ai=0.5,
+                evidence=["cannot-open-video"],
+                status="failed",
+            )
+        fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+        total = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0
+        dur = total / fps if fps > 0 else 0.0
+    else:
+        fps = float(sampled.get("fps") or 0.0)
+        dur = float(sampled.get("duration") or 0.0)
     idxs = uniform_sample_indices(dur, fps, sample_frames)
     if not idxs:
-        cap.release()
+        if cap is not None:
+            cap.release()
         return SignalScore(
             "s3_freq",
             prob_ai=0.5,
@@ -53,14 +61,19 @@ def score(video_path: str | Path, sample_frames: int = 2) -> SignalScore:
     vars_fft = []
     vars_block_fft = []
     for i in idxs:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, i)
-        ret, frame = cap.read()
+        if sampled is None:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+            ret, frame = cap.read()
+        else:
+            frame = sampled["frames"].get(i)
+            ret = frame is not None
         if not ret or frame is None:
             continue
         vars_fft.append(_fft_var(frame))
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         vars_block_fft.append(_block_var(gray))
-    cap.release()
+    if cap is not None:
+        cap.release()
     if not vars_fft:
         return SignalScore(
             "s3_freq",

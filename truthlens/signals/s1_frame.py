@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import threading
 from pathlib import Path
 
 import cv2
@@ -18,14 +19,17 @@ PREVIEW_JPEG_QUALITY = 70
 
 _clf = None
 _clf_method: str | None = None
+_clf_lock = threading.Lock()
 
 
 def _classifier():
     global _clf, _clf_method
     if _clf is None:
-        from truthlens.models.frame_clf import get_classifier
+        with _clf_lock:
+            if _clf is None:
+                from truthlens.models.frame_clf import get_classifier
 
-        _clf, _clf_method = get_classifier()
+                _clf, _clf_method = get_classifier()
     return _clf, _clf_method
 
 
@@ -53,23 +57,43 @@ def _fps_duration(cap: cv2.VideoCapture) -> tuple[float, float]:
     return float(fps), float(duration)
 
 
-def score(video_path: str | Path, sample_frames: int | None = None) -> SignalScore:
+def score(
+    video_path: str | Path,
+    sample_frames: int | None = None,
+    sampled: dict | None = None,
+) -> SignalScore:
     if sample_frames is None:
         sample_frames = _cfg_sample_frames()
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        cap.release()
-        return SignalScore(
-            "s1_frame",
-            prob_ai=0.5,
-            evidence=["cannot-open-video"],
-            status="failed",
+    cap = None
+    if sampled is None:
+        cap = cv2.VideoCapture(str(video_path))
+        if not cap.isOpened():
+            cap.release()
+            return SignalScore(
+                "s1_frame",
+                prob_ai=0.5,
+                evidence=["cannot-open-video"],
+                status="failed",
+            )
+        fps, duration = _fps_duration(cap)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+        idxs = uniform_sample_indices(duration, fps, sample_frames)
+    else:
+        fps = float(sampled.get("fps") or 0.0)
+        duration = float(sampled.get("duration") or 0.0)
+        total_frames = int(sampled.get("total_frames") or 0)
+        idxs = uniform_sample_indices(duration, fps, sample_frames)
+        first_frame = next(
+            (
+                sampled["frames"].get(index)
+                for index in idxs
+                if sampled["frames"].get(index) is not None
+            ),
+            None,
         )
-    fps, duration = _fps_duration(cap)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
-    idxs = uniform_sample_indices(duration, fps, sample_frames)
+        height, width = first_frame.shape[:2] if first_frame is not None else (0, 0)
     clf, clf_method = _classifier()
     use_model = clf.available
     if use_model:
@@ -81,8 +105,12 @@ def score(video_path: str | Path, sample_frames: int | None = None) -> SignalSco
     crops_count = 0
 
     for i in idxs:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, i)
-        ret, frame = cap.read()
+        if sampled is None:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+            ret, frame = cap.read()
+        else:
+            frame = sampled["frames"].get(i)
+            ret = frame is not None
         t = round(i / fps, 3) if fps > 0 else 0.0
         if not ret or frame is None:
             timeline.append({"t": t, "score": 0.5, "processed": False, "frame": i})
@@ -111,7 +139,8 @@ def score(video_path: str | Path, sample_frames: int | None = None) -> SignalSco
             }
         )
 
-    cap.release()
+    if cap is not None:
+        cap.release()
     if not frame_probs:
         return SignalScore(
             "s1_frame",

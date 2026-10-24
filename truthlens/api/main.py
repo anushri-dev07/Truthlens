@@ -1,9 +1,11 @@
+import asyncio
 import hmac
 import logging
 import os
 import re
 import secrets
 import tempfile
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -252,9 +254,11 @@ async def analyze(
     csrf_token: str | None = Form(default=None),
 ):
     user = _current_user(request)
+    request_started = time.perf_counter()
     if user and not _valid_csrf(request, csrf_token):
         return _upload_error(request, "The request could not be verified. Reload and retry.", 403)
     uploads = [u for u in (video or []) if u and u.filename]
+    logger.info("analysis request received file_count=%d", len(uploads))
     if not uploads:
         return _upload_error(request, "Select at least one video to analyze.", 400)
     if len(uploads) > MAX_BATCH_FILES:
@@ -307,11 +311,19 @@ async def analyze(
     finally:
         for upload in uploads:
             await upload.close()
+    logger.info("upload staged file_count=%d total_bytes=%d", len(staged), total_size)
 
     for upload, path in staged:
         filename = Path(upload.filename).name
+        pipeline_started = time.perf_counter()
         try:
-            res = run_pipeline(path, filename=filename)
+            res = await asyncio.to_thread(run_pipeline, path, filename=filename)
+            logger.info(
+                "analysis pipeline completed suffix=%s elapsed_seconds=%.2f signals=%s",
+                Path(filename).suffix.lower(),
+                time.perf_counter() - pipeline_started,
+                res.get("signals_analysed"),
+            )
             owner_id = user["id"] if user else None
             record_id = save_analysis(res, owner_id=owner_id) if owner_id else save_analysis(res)
             if not record_id:
@@ -322,7 +334,11 @@ async def analyze(
             res["csrf_token"] = _csrf_token(request)
             results.append(res)
         except Exception:
-            logger.exception("Video analysis failed for %s", filename)
+            logger.exception(
+                "video analysis failed suffix=%s elapsed_seconds=%.2f",
+                Path(filename).suffix.lower(),
+                time.perf_counter() - pipeline_started,
+            )
             results.append(
                 {
                     "error": (
@@ -334,6 +350,12 @@ async def analyze(
             )
         finally:
             Path(path).unlink(missing_ok=True)
+
+    logger.info(
+        "analysis request completed elapsed_seconds=%.2f result_count=%d",
+        time.perf_counter() - request_started,
+        len(results),
+    )
 
     if len(results) == 1 and "error" not in results[0]:
         return templates.TemplateResponse(request, "result.html", results[0])

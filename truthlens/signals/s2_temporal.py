@@ -16,20 +16,28 @@ def _fps_dur(cap: cv2.VideoCapture) -> tuple[float, float]:
     return float(fps), float(dur)
 
 
-def score(video_path: str | Path, sample_frames: int = 3) -> SignalScore:
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        cap.release()
-        return SignalScore(
-            "s2_temporal",
-            prob_ai=0.5,
-            evidence=["cannot-open-video"],
-            status="failed",
-        )
-    fps, dur = _fps_dur(cap)
+def score(
+    video_path: str | Path, sample_frames: int = 3, sampled: dict | None = None
+) -> SignalScore:
+    cap = None
+    if sampled is None:
+        cap = cv2.VideoCapture(str(video_path))
+        if not cap.isOpened():
+            cap.release()
+            return SignalScore(
+                "s2_temporal",
+                prob_ai=0.5,
+                evidence=["cannot-open-video"],
+                status="failed",
+            )
+        fps, dur = _fps_dur(cap)
+    else:
+        fps = float(sampled.get("fps") or 0.0)
+        dur = float(sampled.get("duration") or 0.0)
     idxs = uniform_sample_indices(dur, fps, sample_frames)
     if not idxs:
-        cap.release()
+        if cap is not None:
+            cap.release()
         return SignalScore(
             "s2_temporal",
             prob_ai=0.5,
@@ -41,8 +49,12 @@ def score(video_path: str | Path, sample_frames: int = 3) -> SignalScore:
     prev_gray = None
     decoded_frames = 0
     for i in idxs:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, i)
-        ret, frame = cap.read()
+        if sampled is None:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+            ret, frame = cap.read()
+        else:
+            frame = sampled["frames"].get(i)
+            ret = frame is not None
         if not ret or frame is None:
             continue
         decoded_frames += 1
@@ -57,7 +69,8 @@ def score(video_path: str | Path, sample_frames: int = 3) -> SignalScore:
             except Exception:
                 flow_mags.append(0.0)
         prev_gray = gray
-    cap.release()
+    if cap is not None:
+        cap.release()
     if not flow_mags and not diff_vars:
         evidence = ["no-readable-frames"] if decoded_frames == 0 else ["no-temporal-pairs"]
         status = "failed" if decoded_frames == 0 else "not_available"
