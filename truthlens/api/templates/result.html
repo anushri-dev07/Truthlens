@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TruthLens - Forensic Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: radial-gradient(1200px 800px at 50% -10%, #1f2937, #0b1020); --card: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)); --border: rgba(255,255,255,0.12); --text:#e5e7eb; --muted:#9ca3af; --ai:#f87171; --real:#4ade80; --warn:#fbbf24; }
+    *{box-sizing:border-box;font-family:Inter,system-ui,sans-serif}
+    body{margin:0;background:var(--bg);color:var(--text);min-height:100dvh}
+    header{display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem}
+    .brand{display:flex;gap:.75rem;align-items:center}
+    .dot{width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff,#22d3ee);box-shadow:0 0 40px 6px rgba(34,211,238,.25)}
+    main{max-width:920px;margin:0 auto;padding:2rem;display:grid;gap:1rem}
+    .card{backdrop-filter:blur(12px);background:var(--card);border:1px solid var(--border);border-radius:1rem;padding:clamp(1rem,2vw,2rem)}
+    .kpi{display:flex;flex-wrap:wrap;gap:1.5rem;align-items:center;justify-content:space-between}
+    .big{font-size:clamp(2.5rem,6vw,5rem);font-weight:600;margin:0;line-height:1}
+    .muted{color:var(--muted)}
+    .verdict{display:inline-flex;padding:.5rem .9rem;border-radius:999px;border:1px solid var(--border);font-weight:600}
+    .v-ai{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.5)}
+    .v-real{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.5)}
+    .v-inconclusive{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.5)}
+    .bar{background:rgba(255,255,255,.08);height:10px;border-radius:999px;overflow:hidden;margin-top:1rem}
+    .fill{height:100%;background:linear-gradient(90deg,#22c55e,#f59e0b,#ef4444)}
+    .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem}
+    .stat{border:1px solid var(--border);border-radius:.75rem;padding:1rem;background:rgba(255,255,255,.02)}
+    .stat .v{font-size:1.6rem;font-weight:600}
+    .btn{display:inline-flex;padding:.7rem 1rem;border-radius:.6rem;border:1px solid var(--border);color:var(--text);text-decoration:none;background:linear-gradient(90deg,rgba(34,211,238,.18),rgba(167,139,250,.18))}
+    .pill{display:inline-block;padding:.2rem .6rem;border-radius:999px;border:1px solid var(--border);margin:.2rem .3rem .2rem 0;font-size:.85rem}
+    code{background:rgba(255,255,255,.06);padding:.1rem .35rem;border-radius:.3rem;font-size:.85rem;word-break:break-all}
+    ul{margin:.5rem 0 0;padding-left:1.1rem}
+    li{margin:.25rem 0}
+    h2{margin:0 0 .25rem;font-size:1.15rem}
+    .lede{color:var(--muted);margin:.15rem 0 1rem;font-size:.92rem}
+
+    /* findings */
+    .finding{border:1px solid var(--border);border-radius:.75rem;padding:1rem;margin:.75rem 0;background:rgba(255,255,255,.02)}
+    .finding-head{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;justify-content:space-between}
+    .badge{display:inline-block;padding:.15rem .5rem;border-radius:999px;font-size:.75rem;border:1px solid var(--border)}
+    .b-completed{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.4)}
+    .b-not_available{background:rgba(148,163,184,.15)}
+    .b-failed{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4)}
+    .dir{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;padding:.15rem .5rem;border-radius:.3rem;border:1px solid var(--border)}
+    .dir-supports{color:var(--ai);border-color:rgba(248,113,113,.45)}
+    .dir-contradicts{color:var(--real);border-color:rgba(74,222,128,.45)}
+    .dir-no_effect{color:var(--muted)}
+    .dir-inconclusive{color:var(--warn);border-color:rgba(251,191,36,.45)}
+    .meas{font-weight:600}
+    .frow{display:grid;grid-template-columns:minmax(140px,210px) 1fr;gap:.5rem 1rem;padding:.55rem 0;border-top:1px solid var(--border)}
+    .frow:first-of-type{border-top:none}
+    .frow .k{color:var(--muted);font-size:.88rem}
+    .frow .v{font-size:.92rem}
+    .lim{margin-top:.35rem;color:var(--muted);font-size:.83rem;font-style:italic}
+    details.tech{margin-top:.6rem;border-top:1px dashed var(--border);padding-top:.5rem}
+    details.tech summary{cursor:pointer;color:var(--muted);font-size:.85rem}
+    details.tech pre{white-space:pre-wrap;word-break:break-all;background:rgba(0,0,0,.25);padding:.6rem;border-radius:.5rem;font-size:.78rem;color:var(--muted);margin:.5rem 0 0}
+
+    /* timeline */
+    .tl-wrap{margin-top:.5rem}
+    .tl-track{position:relative;height:52px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:.5rem}
+    .tl-mark{position:absolute;top:10px;width:14px;height:32px;border-radius:4px;transform:translateX(-50%);cursor:pointer;border:1px solid rgba(0,0,0,.35)}
+    .tl-mark[aria-selected="true"]{outline:2px solid #e5e7eb;outline-offset:2px}
+    .tl-mark.unreadable{background:#6b7280 !important}
+    .tl-axis{display:flex;justify-content:space-between;font-size:.75rem;color:var(--muted);margin-top:.3rem}
+    .tl-detail{display:grid;grid-template-columns:minmax(180px,320px) 1fr;gap:1rem;margin-top:1rem;align-items:start}
+    .tl-detail img{width:100%;border-radius:.5rem;border:1px solid var(--border);display:block}
+    .tl-meta{font-size:.9rem}
+    .tl-meta .row{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.4rem}
+    .empty{padding:1rem;border:1px dashed var(--border);border-radius:.6rem;color:var(--muted);font-size:.9rem}
+    .note{background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.3);border-radius:.6rem;padding:.7rem .9rem;font-size:.88rem}
+    :root{color-scheme:dark;--bg:#0b1020;--card:#121a2b;--border:#29354a;--text:#edf2fa;--muted:#aebbd0;--ai:#ff9a9a;--real:#85e0aa;--warn:#ffd27a;--accent:#7dd3fc}
+    body{background:radial-gradient(900px 420px at 50% -15%,#1b2a42,var(--bg))}
+    header{gap:1rem;padding:1rem clamp(1rem,4vw,2.5rem);border-bottom:1px solid rgba(255,255,255,.06)}
+    main{max-width:980px;padding:clamp(1rem,3vw,2rem);gap:.85rem}
+    .nav-actions{display:flex;gap:.5rem;flex-wrap:wrap}.btn{padding:.58rem .85rem;background:#ffffff08;font-size:.88rem}.btn:hover{background:#ffffff12}
+    .report-title{font-size:clamp(1.2rem,2.5vw,1.65rem);margin:0;overflow-wrap:anywhere}.eyebrow{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);margin:0 0 .35rem}
+    .summary,.overview,.disclosure{border:1px solid var(--border);border-radius:.8rem;background:linear-gradient(160deg,#ffffff09,#ffffff04)}.summary{padding:1.1rem 1.2rem}
+    .summary-top{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}.score-block{display:flex;align-items:baseline;gap:.65rem;flex-wrap:wrap;margin-top:.8rem}.score{font-size:clamp(1.7rem,4vw,2.35rem);font-weight:700;letter-spacing:-.04em}.score-label{font-size:.9rem;color:var(--muted)}.score-note{font-size:.83rem;color:var(--muted);margin:.35rem 0 0;line-height:1.5}
+    .warning{margin:.8rem 0 0;padding:.65rem .8rem;border-radius:.55rem;border:1px solid #fbbf2466;background:#f59e0b14;color:#ffe2a8;font-size:.88rem;line-height:1.5}.warning.unavailable{border-color:#94a3b866;background:#94a3b811;color:#d3ddeb}
+    .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;margin-top:.9rem}.stat{padding:.65rem .75rem;border:1px solid #ffffff12;border-radius:.55rem;background:#ffffff04}.stat-value{display:block;font-size:1rem;font-weight:650}.stat-label{display:block;color:var(--muted);font-size:.75rem;margin-top:.12rem}
+    .overview{padding:1rem 1.1rem}.section-title{font-size:.98rem;margin:0 0 .65rem}.evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}.evidence-cell{min-width:0;border:1px solid #ffffff12;border-radius:.55rem;padding:.65rem .7rem;background:#ffffff04}.evidence-cell h3{font-size:.78rem;color:var(--muted);font-weight:600;margin:0 0 .35rem}.chips,.check-list{display:flex;gap:.35rem;flex-wrap:wrap}.chip,.status{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:999px;padding:.2rem .5rem;font-size:.75rem}.chip{background:#ffffff06}.empty-inline,.check-item{font-size:.76rem;color:var(--muted)}.check-list{margin-top:.65rem}.check-item{display:flex;align-items:center;gap:.38rem}.status{font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}.b-completed{color:var(--real);border-color:#4ade8055;background:#22c55e12}.b-not_available{color:#d3ddeb;background:#94a3b812}.b-failed{color:var(--ai);border-color:#f8717155;background:#ef444412}
+    .disclosure{overflow:hidden}.disclosure>summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;cursor:pointer;list-style:none;padding:.82rem 1rem;font-size:.9rem;font-weight:620}.disclosure>summary::-webkit-details-marker{display:none}.disclosure>summary:after{content:'＋';color:var(--accent);font-size:1.1rem}.disclosure[open]>summary:after{content:'−'}.disclosure>summary:hover{background:#ffffff06}.disclosure>summary:focus-visible,.btn:focus-visible,.tl-mark:focus-visible{outline:3px solid var(--accent);outline-offset:2px}.disclosure-content{padding:0 1rem 1rem;border-top:1px solid #ffffff0d}.summary-meta{display:flex;align-items:center;gap:.45rem;color:var(--muted);font-size:.76rem;font-weight:450}
+    .lede{color:var(--muted);margin:.7rem 0;font-size:.86rem;line-height:1.5}.finding-summary{color:var(--muted);font-size:.85rem;line-height:1.5;margin:.7rem 0}.frow{grid-template-columns:minmax(150px,210px) 1fr;gap:.4rem .9rem;padding:.65rem 0;border-top:1px solid #ffffff10}.frow .k{color:var(--muted);font-size:.82rem}.frow .v{font-size:.86rem;line-height:1.5}.meas{font-weight:650}.dir{margin-left:.35rem;padding:.12rem .4rem;font-size:.66rem}.lim,.refs{margin-top:.35rem;color:var(--muted);font-size:.78rem}.tech-list{margin:.4rem 0 0;padding-left:1.1rem;color:var(--muted);font-size:.82rem}.tech-list li{margin:.35rem 0}.tech-list pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#050914;padding:.55rem;border-radius:.4rem;font-size:.75rem;color:#c4cfdf;margin:.35rem 0}
+    .tl-track{height:48px}.tl-mark{top:8px;width:13px;height:30px}.tl-detail{grid-template-columns:minmax(160px,280px) 1fr;gap:1rem;margin-top:.85rem}.tl-meta button{margin:.5rem .35rem 0 0;background:#ffffff08;color:var(--text);border:1px solid var(--border);padding:.4rem .65rem;border-radius:.4rem;cursor:pointer}.warning-note{font-size:.83rem;color:var(--muted);line-height:1.5}.footer-note{color:var(--muted);font-size:.75rem;text-align:center;padding:.5rem}
+    @media(max-width:640px){header{align-items:flex-start;flex-direction:column}.nav-actions{width:100%}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.evidence-grid{grid-template-columns:1fr}.frow{grid-template-columns:1fr}.tl-detail{grid-template-columns:1fr}.summary-top{align-items:flex-start;flex-direction:column}}
+    /* Product dashboard composition: result first, report details on demand. */
+    body{background:#0a1020;color:#eef3fb}
+    header{position:sticky;top:0;z-index:5;background:#0a1020eF;backdrop-filter:blur(14px);padding:.8rem clamp(1rem,4vw,2.5rem)}
+      .brand{flex-shrink:0}.header-file{min-width:0;flex:1;margin:0 1.1rem;color:#d7e1ef;font-size:.84rem;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      main{max-width:1060px;gap:.8rem;padding:1.15rem clamp(1rem,3vw,2rem) 1.5rem}
+      .summary{position:relative;padding:clamp(1.1rem,3vw,1.7rem);background:linear-gradient(135deg,#192d47 0%,#142238 54%,#111a2c 100%);border-color:#3b526e;box-shadow:0 24px 70px #0004}
+      .summary:before{content:"";position:absolute;inset:0 auto 0 0;width:4px;border-radius:.8rem 0 0 .8rem;background:var(--accent)}
+      .assessment-line{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;margin-bottom:.7rem}.assessment-line .eyebrow{margin:0}.complete-tag{color:#a8d9ff;background:#7dd3fc16;border:1px solid #7dd3fc44;border-radius:999px;padding:.24rem .5rem;font-size:.66rem;letter-spacing:.08em;font-weight:700}
+      .summary-top{align-items:center}.summary-top>div:first-child{display:grid;gap:.45rem}.verdict{font-size:clamp(1.25rem,3vw,1.8rem);line-height:1.2;padding:0;border:0;background:none;color:var(--text)}.verdict.v-likely_ai{color:var(--ai)}.verdict.v-likely_real{color:#c6f4d5}.verdict.v-inconclusive{color:var(--warn)}
+      .score-block{display:grid;justify-items:end;gap:.12rem;margin:0}.score{font-size:clamp(2.5rem,6vw,4rem);line-height:1}.score-label{max-width:230px;text-align:right;font-size:.76rem;line-height:1.4}.score-note{max-width:720px;margin:.55rem 0 0;font-size:.76rem}
+      .warning{margin:.72rem 0 0;padding:.62rem .78rem;font-size:.83rem}.stats{gap:.55rem;margin-top:.9rem}.stat{display:flex;align-items:baseline;gap:.5rem;padding:.62rem .72rem}.stat-value{font-size:1.12rem;white-space:nowrap}.stat-label{font-size:.75rem;margin:0}
+      .overview{padding:.85rem .95rem;background:#111a2b}.overview-head{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem}.overview-head .section-title{margin:0}.evidence-grid{gap:.45rem;margin-top:.55rem}.evidence-cell{padding:.5rem .6rem}.check-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.45rem;margin-top:.65rem}.check-item{min-width:0;display:flex;justify-content:space-between;align-items:center;gap:.35rem;padding:.45rem .5rem;border:1px solid #ffffff10;border-radius:.45rem;background:#ffffff04;font-size:.75rem}.check-item-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.status{font-size:.63rem;padding:.14rem .4rem}.b-completed{color:#a8ebc1;border-color:#4ade8055;background:#22c55e12}.warning-note{margin:.52rem 0 0;font-size:.72rem}
+      .technical-shell{background:#101827}.technical-shell>summary{font-size:.9rem;padding:.8rem .95rem}.technical-shell>summary:after{content:'Open'}.technical-shell[open]>summary:after{content:'Close'}.technical-shell>.disclosure-content{padding-top:.2rem}.technical-intro{color:var(--muted);font-size:.78rem;margin:.45rem 0 .65rem}
+      .disclosure:not(.technical-shell){background:#ffffff03;border-radius:.55rem;margin:.45rem 0;border-color:#ffffff12}.disclosure:not(.technical-shell)>summary{padding:.64rem .75rem;font-size:.82rem}.disclosure:not(.technical-shell)>.disclosure-content{padding:0 .75rem .75rem}.summary-meta{flex-wrap:wrap;justify-content:flex-end}
+      .details-section-title{font-size:.82rem;margin:.75rem 0 .4rem;color:#dce7f5}.frow{display:grid}.footer-note{padding:.25rem;font-size:.7rem}
+      @media(max-width:640px){header{align-items:center}.header-file{order:3;width:100%;flex:auto;margin:.2rem 0 0}.nav-actions{order:2}.summary-top{align-items:flex-start;flex-direction:column}.score-block{justify-items:start}.score-label{text-align:left}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.stat{display:grid;gap:.12rem;padding:.5rem}.stat-value{font-size:1rem}.stat-label{font-size:.64rem}.check-list{grid-template-columns:repeat(2,minmax(0,1fr))}.summary-meta{justify-content:flex-start}}
+      .preview-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.55rem;padding:.7rem .85rem;background:#111a2b;border:1px solid var(--border);border-radius:.7rem}
+      .preview-frame{min-width:0;margin:0}.preview-frame img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:.4rem;background:#080d17}.preview-frame button{display:block;width:100%;padding:0;border:0;border-radius:.4rem;background:none;cursor:pointer}.preview-frame button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}.preview-frame figcaption{margin-top:.3rem;color:var(--muted);font-size:.7rem}
+      .evidence-list{display:grid;gap:.4rem}.evidence-row{display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.65rem .75rem;border-bottom:1px solid #ffffff12}.evidence-row:last-child{border-bottom:0}.evidence-label{font-size:.83rem;font-weight:650}.evidence-summary{color:var(--muted);font-size:.8rem;line-height:1.45;margin:.18rem 0 0}.evidence-state{flex:none;color:#b7c7da;font-size:.68rem;border:1px solid var(--border);border-radius:999px;padding:.16rem .45rem}
+      .summary .verdict{font-size:clamp(1.4rem,3vw,2rem)}.summary .score-note{margin:.65rem 0 0;max-width:660px}.main-warning{margin:.7rem 0 0}.evidence-overview{padding:.9rem 1rem}.disclosure-content .overview{margin:.75rem 0 0}
+      .file-summary{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;padding:.1rem .2rem}.file-name{font-size:.93rem;font-weight:650;overflow-wrap:anywhere}.file-meta{display:flex;gap:.75rem;flex-wrap:wrap;color:var(--muted);font-size:.75rem}
+      .readiness-card{display:grid;grid-template-columns:100px 1fr;align-items:center;gap:1rem;padding:.9rem 1rem;border:1px solid #ffffff18;border-radius:.7rem;background:#111a2b}.readiness-ring{--readiness:0%;position:relative;display:grid;place-items:center;width:88px;aspect-ratio:1;border-radius:50%;background:conic-gradient(#22d3ee var(--readiness),#ffffff18 0)}.readiness-ring:before{position:absolute;inset:6px;border-radius:50%;background:#111a2b;content:""}.readiness-number{position:relative;font-size:1.2rem;font-weight:700}.readiness-number small{font-size:.65rem;color:var(--muted)}.readiness-title{font-size:.95rem;margin:0}.readiness-label{margin:.18rem 0;color:#b9dff3;font-size:.8rem;font-weight:600}.readiness-note{color:var(--muted);font-size:.76rem;line-height:1.45;margin:.28rem 0 0}.readiness-factors{display:flex;gap:.35rem .85rem;flex-wrap:wrap;margin:.45rem 0 0;padding:0;list-style:none;color:var(--muted);font-size:.72rem}
+      .technical-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin:.6rem 0}.technical-actions .btn{margin:0}
+      @media(max-width:640px){.preview-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.evidence-row{align-items:flex-start}.readiness-card{grid-template-columns:76px 1fr;gap:.7rem;padding:.75rem}.readiness-ring{width:70px}.file-summary{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+  {% macro render_signal(f) %}
+    <p class="finding-summary">{{ f.summary }}</p>
+    {% for fd in f.findings %}
+    <div class="frow">
+      <div class="k">{{ fd.title }}</div>
+      <div class="v">
+        <span class="meas">{{ fd.measured }}</span>{% if fd.unit %}<span class="muted"> · {{ fd.unit }}</span>{% endif %}
+        {% if fd.direction != 'no_effect' %}<span class="dir dir-{{ fd.direction }}">{{ fd.direction.replace('_',' ') }}</span>{% endif %}
+        <div>{{ fd.interpretation }}</div>
+        {% if fd.explanation %}<div class="muted">{{ fd.explanation }}</div>{% endif %}
+        {% if fd.limitation %}<div class="lim">Limitation: {{ fd.limitation }}</div>{% endif %}
+        {% if fd.references %}<div class="refs">Frame references: {% for ref in fd.references %}t={{ ref.t }}s (score {{ (ref.score * 100)|round(0) }}%){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% endmacro %}
+
+  <header>
+    <div class="brand"><div class="dot"></div><strong>TruthLens</strong></div>
+    <nav class="nav-actions" aria-label="Report navigation">
+      {% if user %}<a class="btn" href="/history">My history</a><form action="/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn" type="submit">Log out</button></form>{% endif %}
+      <a class="btn" href="/">Analyze another</a>
+    </nav>
+  </header>
+  <main>
+    <section class="file-summary" aria-label="Analyzed video">
+      <span class="file-name" title="{{ file.name or 'Unnamed video' }}">{{ file.name or 'Unnamed video' }}</span>
+      <span class="file-meta">
+        {% if file.size_mb is defined %}<span>{{ file.size_mb }} MiB</span>{% endif %}
+        {% if timeline_meta.duration_sec %}<span>{{ timeline_meta.duration_sec }} s</span>{% endif %}
+        {% if timeline_meta.width and timeline_meta.height %}<span>{{ timeline_meta.width }} × {{ timeline_meta.height }}</span>{% endif %}
+      </span>
+    </section>
+    <section class="summary" aria-labelledby="assessment-title">
+      <div class="assessment-line"><p class="eyebrow" id="assessment-title">Video authenticity analysis</p><span class="complete-tag">ANALYSIS COMPLETE</span></div>
+      <div class="summary-top">
+        <div>
+          <span class="verdict v-{{ verdict }}">{{ verdict_text }}</span>
+          <p class="score-note">{{ verdict_meaning }}</p>
+        </div>
+      </div>
+      {% if disagreement %}<p class="warning main-warning"><strong>Mixed signals:</strong> Checks disagree; interpret this result cautiously.</p>{% endif %}
+      {% if missing %}<p class="warning unavailable main-warning">{{ missing|length }} of {{ signals_total }} checks unavailable or failed. Missing checks do not count as evidence.</p>{% endif %}
+      {% if history_warning %}<p class="warning main-warning">{{ history_warning }}</p>{% endif %}
+    </section>
+
+    <section class="readiness-card" aria-labelledby="readiness-title">
+      {% if readiness is defined and readiness.score is not none %}
+      <div class="readiness-ring" style="--readiness: {{ readiness.score }}%" role="img" aria-label="Readiness Score {{ readiness.score }} out of 100"><span class="readiness-number">{{ readiness.score }}<small>/100</small></span></div>
+      {% else %}<div class="readiness-ring" role="img" aria-label="Readiness Score unavailable"><span class="readiness-number">N/A</span></div>{% endif %}
+      <div>
+        <h2 class="readiness-title" id="readiness-title">Readiness Score</h2>
+        <p class="readiness-label">{{ readiness.label if readiness is defined else 'Unavailable' }}</p>
+        <p class="readiness-note">Evidence completeness for analysis, not likelihood of AI generation.</p>
+        {% if readiness is defined and readiness.factors %}<ul class="readiness-factors">{% for factor in readiness.factors %}<li>{{ factor }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+    </section>
+
+    <section class="overview evidence-overview" aria-labelledby="overview-title">
+      <h2 class="section-title" id="overview-title">Key findings</h2>
+      <div class="evidence-list">
+        {% for f in findings if f.status == 'completed' and f.signal != 's6_semantic' %}
+          {% if loop.index <= 3 %}
+          <article class="evidence-row">
+            <div><div class="evidence-label">{{ f.label }}</div><p class="evidence-summary">{{ f.summary }}</p></div>
+            <span class="evidence-state">Available</span>
+          </article>
+          {% endif %}
+        {% else %}
+          <p class="warning-note">No supported signal findings are available for this analysis.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% set preview_frames = timeline|selectattr('preview')|list %}
+    {% if preview_frames %}
+    <section aria-labelledby="preview-title">
+      <h2 class="section-title" id="preview-title">Sampled frames</h2>
+      <div class="preview-strip">
+        {% for frame in preview_frames[:5] %}
+        <figure class="preview-frame">
+          {% if frame.frame is defined %}<button type="button" class="preview-frame-button" data-frame="{{ frame.frame }}" aria-label="Show analysis for sampled frame {{ frame.frame }}"><img src="{{ frame.preview }}" alt="Sampled video frame at {{ frame.t }} seconds"></button>
+          {% else %}<img src="{{ frame.preview }}" alt="Sampled video frame at {{ frame.t }} seconds">{% endif %}
+          <figcaption>{{ frame.t }}s{% if frame.frame is defined %} · Frame {{ frame.frame }}{% endif %}</figcaption>
+        </figure>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <details class="disclosure technical-shell">
+      <summary><span>View technical details</span><span class="summary-meta">Measurements, frame details, hash &amp; limitations</span></summary>
+      <div class="disclosure-content">
+        <p class="technical-intro">Expand an item to inspect the measurements and explanations retained in the report.</p>
+        {% if overall_score is not none %}<p class="technical-intro">Uncalibrated detection score: <strong>{{ overall_score }}%</strong>. This is not a probability of AI-generation.</p>{% endif %}
+        {% if readiness is defined %}<p class="technical-intro">Readiness formula: {{ readiness.definition }}</p>{% endif %}
+        <div class="technical-actions">
+          {% if id %}<a class="btn" href="/report/{{ id }}/pdf">Download PDF</a>{% endif %}
+          <a class="btn" href="/history">History</a>
+        </div>
+        <div class="stats" aria-label="Analysis summary statistics">
+          <div class="stat"><span class="stat-value">{{ signals_analysed }} / {{ signals_total }}</span><span class="stat-label">Checks available</span></div>
+          <div class="stat"><span class="stat-value">{{ timeline_meta.scored_frames if timeline_meta.scored_frames is not none else '—' }}</span><span class="stat-label">Sampled frames scored</span></div>
+          <div class="stat"><span class="stat-value">{% if timeline_meta.duration_sec %}{{ timeline_meta.duration_sec }} s{% else %}—{% endif %}</span><span class="stat-label">Video duration</span></div>
+        </div>
+        <section class="overview" aria-label="All signal directions">
+          <div class="overview-head"><h2 class="section-title">All signal directions</h2><span class="warning-note">Signals are not independent confirmations.</span></div>
+          <div class="evidence-grid">
+            <div class="evidence-cell"><h3>Leans toward AI-generation</h3><div class="chips">{% if supporting %}{% for item in supporting %}<span class="chip">{{ item }}</span>{% endfor %}{% else %}<span class="empty-inline">None listed</span>{% endif %}</div></div>
+            <div class="evidence-cell"><h3>Leans away from AI-generation</h3><div class="chips">{% if contradicting %}{% for item in contradicting %}<span class="chip">{{ item }}</span>{% endfor %}{% else %}<span class="empty-inline">None listed</span>{% endif %}</div></div>
+          </div>
+          <div class="check-list" aria-label="Check availability">
+            {% for f in findings %}<span class="check-item"><span class="check-item-name">{{ f.label }}</span> <span class="status b-{{ f.status }}">{% if f.status == 'completed' %}available{% else %}{{ f.status.replace('_',' ') }}{% endif %}</span></span>{% endfor %}
+          </div>
+        </section>
+    <details class="disclosure">
+      <summary><span>1. Evidence timeline and sampled frames</span><span class="summary-meta">{{ timeline|length }} sampled</span></summary>
+      <div class="disclosure-content">
+        <p class="lede">{% if timeline %}{{ timeline_meta.scored_frames }} frame(s) were sampled and scored. The rest of the video was not analysed frame by frame.{% else %}No frame-level samples were produced for this file.{% endif %}</p>
+        {% if timeline %}
+        <div class="tl-wrap">
+          <div class="tl-track" id="tlTrack" role="group" aria-label="Sampled frames">
+            {% for f in timeline %}
+            {% set dur = timeline_meta.duration_sec or 0 %}{% set pos = (f.t / dur * 100) if dur else 0 %}
+            {% set col = '#ef4444' if f.score >= 0.6 else ('#22c55e' if f.score <= 0.4 else '#f59e0b') %}
+            <div class="tl-mark{% if not f.processed %} unreadable{% endif %}" style="left:{{ pos }}%;background:{{ col }}" data-idx="{{ loop.index0 }}" data-t="{{ f.t }}" data-score="{{ f.score }}" data-frame="{{ f.frame if f.frame is defined else '' }}" data-processed="{{ 1 if f.processed else 0 }}" role="button" tabindex="0" aria-selected="{% if loop.first %}true{% else %}false{% endif %}" title="t={{ f.t }}s"></div>
+            {% endfor %}
+          </div>
+          <div class="tl-axis"><span>0.0s</span><span>{% if timeline_meta.duration_sec %}{{ timeline_meta.duration_sec }}s (end){% else %}end{% endif %}</span></div>
+          <div class="tl-detail"><div><img id="tlImage" alt="Sampled frame preview" /></div><div class="tl-meta"><div class="row"><span class="pill" id="tlTime">—</span><span class="pill" id="tlScore">—</span><span class="pill" id="tlFrame">—</span></div><div id="tlNote" class="muted"></div><button id="tlPrev" type="button">Previous</button><button id="tlNext" type="button">Next</button></div></div>
+        </div>
+        {% else %}<p class="empty">No frame-level timeline is available for this file.</p>{% endif %}
+      </div>
+    </details>
+
+    {% set sections = [('s1_frame', '2. Frame analysis'), ('s2_temporal', '3. Temporal consistency'), ('s3_freq', '4. Frequency analysis'), ('s4_audio', '5. Audio analysis'), ('s5_meta', '6. Metadata inspection'), ('s6_semantic', '7. Semantic analysis status')] %}
+    {% for signal_key, section_title in sections %}
+    {% for f in findings if f.signal == signal_key %}
+    <details class="disclosure">
+      <summary><span>{{ section_title }}</span><span class="summary-meta">{{ f.label }} <span class="status b-{{ f.status }}">{{ f.status.replace('_',' ') }}</span></span></summary>
+      <div class="disclosure-content">
+        <p class="lede">{{ f.measures }}</p>
+        {{ render_signal(f) }}
+      </div>
+    </details>
+    {% endfor %}
+    {% endfor %}
+
+    <details class="disclosure">
+      <summary><span>8. Digital evidence and SHA-256 verification</span><span class="summary-meta">File metadata</span></summary>
+      <div class="disclosure-content">
+        <p class="lede">The file hash helps verify that this analyzed file has not changed; it does not establish authenticity.</p>
+        <div class="frow"><div class="k">Filename</div><div class="v">{{ file.name }}</div></div>
+        <div class="frow"><div class="k">File size</div><div class="v">{{ file.size_mb }} MB ({{ file.size_bytes }} bytes)</div></div>
+        <div class="frow"><div class="k">SHA-256</div><div class="v"><code>{{ file.sha256 }}</code></div></div>
+        <div class="frow"><div class="k">Detector version</div><div class="v">{{ detector_version }}</div></div>
+        <div class="frow"><div class="k">Analyzed at</div><div class="v">{{ generated_at }}</div></div>
+      </div>
+    </details>
+
+    <details class="disclosure">
+      <summary><span>9. Full limitations and raw technical measurements</span><span class="summary-meta">{{ limitations|length }} limitations</span></summary>
+      <div class="disclosure-content">
+        <h2 class="details-section-title">Full limitations</h2>
+        <ul>{% for limitation in limitations %}<li>{{ limitation }}</li>{% endfor %}</ul>
+        <h2 class="details-section-title" style="margin-top:1rem">Raw technical measurements</h2>
+        {% for f in findings %}
+        <h3>{{ f.label }} <span class="status b-{{ f.status }}">{{ f.status.replace('_',' ') }}</span></h3>
+        {% if f.raw_evidence %}<pre>{{ f.raw_evidence|join('\n') }}</pre>{% else %}<p class="empty-inline">No raw measurements reported.</p>{% endif %}
+        {% endfor %}
+      </div>
+    </details>
+    <p class="footer-note">Experimental screening only, not proof of authenticity. Compression, editing, video quality, and unsupported signals can affect results.</p>
+  </main>
+
+  <script>
+  (function () {
+    var track = document.getElementById('tlTrack');
+    if (!track) return;
+    var marks = Array.prototype.slice.call(track.querySelectorAll('.tl-mark'));
+    if (!marks.length) return;
+
+    // Frame previews are embedded as data URLs in the analysis payload.
+    var frames = {{ timeline | tojson }};
+
+    var img = document.getElementById('tlImage');
+    var elTime = document.getElementById('tlTime');
+    var elScore = document.getElementById('tlScore');
+    var elFrame = document.getElementById('tlFrame');
+    var elNote = document.getElementById('tlNote');
+    var current = -1;
+
+    function render(i) {
+      if (i < 0 || i >= marks.length) return;
+      current = i;
+      var mark = marks[i];
+      var data = frames[i] || {};
+      marks.forEach(function (m, j) {
+        m.setAttribute('aria-selected', j === i ? 'true' : 'false');
+      });
+      var processed = mark.getAttribute('data-processed') === '1';
+      var t = parseFloat(mark.getAttribute('data-t')) || 0;
+      var score = parseFloat(mark.getAttribute('data-score'));
+      var frameNo = mark.getAttribute('data-frame');
+      elTime.textContent = 't = ' + t.toFixed(2) + 's';
+      elScore.textContent = processed && !isNaN(score)
+        ? 'Frame score ' + (score * 100).toFixed(1) + '%'
+        : 'Not scored';
+      elFrame.textContent = frameNo ? 'Frame ' + frameNo : 'Frame index unknown';
+      if (data && data.preview) {
+        img.src = data.preview;
+        img.style.display = 'block';
+      } else {
+        img.removeAttribute('src');
+        img.style.display = 'none';
+      }
+      elNote.textContent = processed
+        ? 'This is a sampled frame. The displayed value is the S1 frame-level output for this frame alone; its method may be a model or the face-presence fallback.'
+        : 'This frame could not be decoded, so it was not scored.';
+    }
+
+    marks.forEach(function (mark, i) {
+      mark.addEventListener('click', function () { render(i); });
+      mark.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); render(i); }
+      });
+    });
+    document.querySelectorAll('.preview-frame-button').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var frameNumber = button.getAttribute('data-frame');
+        var index = marks.findIndex(function (mark) {
+          return mark.getAttribute('data-frame') === frameNumber;
+        });
+        if (index < 0) return;
+        document.querySelector('.technical-shell').open = true;
+        render(index);
+        track.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    });
+    document.getElementById('tlPrev').addEventListener('click', function () {
+      render(current > 0 ? current - 1 : 0);
+    });
+    document.getElementById('tlNext').addEventListener('click', function () {
+      render(current < marks.length - 1 ? current + 1 : marks.length - 1);
+    });
+
+    render(0);
+  })();
+  </script>
+</body>
+</html>
