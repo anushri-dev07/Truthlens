@@ -1,20 +1,56 @@
+import hmac
 import logging
+import os
+import re
+import secrets
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, Response
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
+from truthlens.api.auth import (
+    clear_login_failures,
+    hash_password,
+    login_is_limited,
+    record_login_failure,
+    verify_password,
+)
 from truthlens.inference.pdf_report import render_pdf
 from truthlens.inference.pipeline import run_pipeline
-from truthlens.inference.store import get_analysis, list_analyses, save_analysis
+from truthlens.inference.store import (
+    create_user,
+    delete_analysis,
+    get_analysis,
+    get_user,
+    get_user_by_email,
+    list_analyses,
+    save_analysis,
+)
 
 app = FastAPI(title="TruthLens")
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 logger = logging.getLogger(__name__)
+_SESSION_SECRET = os.environ.get("TRUTHLENS_SESSION_SECRET")
+if not _SESSION_SECRET:
+    _SESSION_SECRET = secrets.token_urlsafe(32)
+    logger.warning(
+        "TRUTHLENS_SESSION_SECRET is unset; auth sessions will not survive a restart."
+    )
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=_SESSION_SECRET,
+    session_cookie="truthlens_session",
+    max_age=60 * 60 * 24 * 7,
+    same_site="lax",
+    https_only=os.environ.get("TRUTHLENS_HTTPS_ONLY", "0") == "1",
+)
+
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov"}
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
@@ -33,9 +69,40 @@ def _upload_error(request: Request, message: str, status_code: int) -> HTMLRespo
     return templates.TemplateResponse(
         request,
         "index.html",
-        {"error": message},
+        {"error": message, "user": _current_user(request), "csrf_token": _csrf_token(request)},
         status_code=status_code,
     )
+
+
+def _current_user(request: Request) -> dict | None:
+    user_id = request.session.get("user_id")
+    if not isinstance(user_id, str):
+        return None
+    user = get_user(user_id)
+    if user is None:
+        request.session.clear()
+    return user
+
+
+def _csrf_token(request: Request) -> str:
+    token = request.session.get("csrf_token")
+    if not isinstance(token, str):
+        token = secrets.token_urlsafe(32)
+        request.session["csrf_token"] = token
+    return token
+
+
+def _valid_csrf(request: Request, submitted: str | None) -> bool:
+    expected = request.session.get("csrf_token")
+    return (
+        isinstance(expected, str)
+        and isinstance(submitted, str)
+        and hmac.compare_digest(expected, submitted)
+    )
+
+
+def _signed_in(request: Request) -> bool:
+    return _current_user(request) is not None
 
 
 async def _stage_upload(upload: UploadFile, suffix: str) -> tuple[str, int]:
@@ -61,11 +128,132 @@ async def _stage_upload(upload: UploadFile, suffix: str) -> tuple[str, int]:
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request, "index.html")
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {"user": _current_user(request), "csrf_token": _csrf_token(request)},
+    )
+
+
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request):
+    if _current_user(request):
+        return RedirectResponse("/history", status_code=303)
+    return templates.TemplateResponse(
+        request, "register.html", {"csrf_token": _csrf_token(request)}
+    )
+
+
+@app.post("/register", response_class=HTMLResponse)
+async def register(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    csrf_token: str = Form(...),
+):
+    normalized_email = email.strip().lower()
+    error = None
+    if not _valid_csrf(request, csrf_token):
+        error = "Your form expired. Reload the page and try again."
+    elif len(normalized_email) > 254 or not _EMAIL_RE.fullmatch(normalized_email):
+        error = "Enter a valid email address."
+    elif len(password) < 12 or len(password) > 128:
+        error = "Use a password between 12 and 128 characters."
+    else:
+        user_id = create_user(normalized_email, hash_password(password))
+        if user_id is None:
+            error = "An account with that email already exists."
+        else:
+            request.session.clear()
+            request.session["user_id"] = user_id
+            _csrf_token(request)
+            return RedirectResponse("/history", status_code=303)
+    return templates.TemplateResponse(
+        request,
+        "register.html",
+        {"error": error, "csrf_token": _csrf_token(request)},
+        status_code=400,
+    )
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    if _current_user(request):
+        return RedirectResponse("/history", status_code=303)
+    return templates.TemplateResponse(request, "login.html", {"csrf_token": _csrf_token(request)})
+
+
+@app.post("/login", response_class=HTMLResponse)
+async def login(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    csrf_token: str = Form(...),
+):
+    normalized_email = email.strip().lower()
+    client_host = request.client.host if request.client else "unknown"
+    login_identity = f"{client_host}:{normalized_email}"
+    if not _valid_csrf(request, csrf_token):
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {
+                "error": "Your form expired. Reload the page and try again.",
+                "csrf_token": _csrf_token(request),
+            },
+            status_code=400,
+        )
+    if login_is_limited(login_identity):
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {
+                "error": "Too many attempts. Try again in 15 minutes.",
+                "csrf_token": _csrf_token(request),
+            },
+            status_code=429,
+        )
+    if len(password) > 128:
+        record_login_failure(login_identity)
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"error": "Email or password is incorrect.", "csrf_token": _csrf_token(request)},
+            status_code=401,
+        )
+    user = get_user_by_email(normalized_email)
+    if not user or not verify_password(password, user["password_hash"]):
+        record_login_failure(login_identity)
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"error": "Email or password is incorrect.", "csrf_token": _csrf_token(request)},
+            status_code=401,
+        )
+    clear_login_failures(login_identity)
+    request.session.clear()
+    request.session["user_id"] = user["id"]
+    _csrf_token(request)
+    return RedirectResponse("/history", status_code=303)
+
+
+@app.post("/logout")
+async def logout(request: Request, csrf_token: str = Form(...)):
+    if not _valid_csrf(request, csrf_token):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+    request.session.clear()
+    return RedirectResponse("/", status_code=303)
 
 
 @app.post("/analyze", response_class=HTMLResponse)
-async def analyze(request: Request, video: list[UploadFile] = File(default=[])):
+async def analyze(
+    request: Request,
+    video: list[UploadFile] = File(default=[]),
+    csrf_token: str | None = Form(default=None),
+):
+    user = _current_user(request)
+    if user and not _valid_csrf(request, csrf_token):
+        return _upload_error(request, "The request could not be verified. Reload and retry.", 403)
     uploads = [u for u in (video or []) if u and u.filename]
     if not uploads:
         return _upload_error(request, "Select at least one video to analyze.", 400)
@@ -124,7 +312,14 @@ async def analyze(request: Request, video: list[UploadFile] = File(default=[])):
         filename = Path(upload.filename).name
         try:
             res = run_pipeline(path, filename=filename)
-            save_analysis(res)
+            owner_id = user["id"] if user else None
+            record_id = save_analysis(res, owner_id=owner_id) if owner_id else save_analysis(res)
+            if not record_id:
+                res["history_warning"] = (
+                    "Analysis completed, but this report could not be saved to history."
+                )
+            res["user"] = user
+            res["csrf_token"] = _csrf_token(request)
             results.append(res)
         except Exception:
             logger.exception("Video analysis failed for %s", filename)
@@ -151,24 +346,52 @@ async def analyze(request: Request, video: list[UploadFile] = File(default=[])):
 
 @app.get("/history", response_class=HTMLResponse)
 async def history(request: Request):
+    user = _current_user(request)
     return templates.TemplateResponse(
-        request, "history.html", {"records": list_analyses()}
+        request,
+        "history.html",
+        {
+            "records": (
+                list_analyses(owner_id=user["id"]) if user else list_analyses()
+            ),
+            "user": user,
+            "csrf_token": _csrf_token(request),
+        },
     )
 
 
 @app.get("/report/{record_id}", response_class=HTMLResponse)
 async def report(request: Request, record_id: str):
-    res = get_analysis(record_id)
+    user = _current_user(request)
+    res = get_analysis(record_id, owner_id=user["id"]) if user else get_analysis(record_id)
     if res is None:
         raise HTTPException(status_code=404, detail="Report not found")
+    res["user"] = user
+    res["csrf_token"] = _csrf_token(request)
     return templates.TemplateResponse(request, "result.html", res)
 
 
 @app.get("/report/{record_id}/pdf")
-async def report_pdf(record_id: str):
-    res = get_analysis(record_id)
+async def report_pdf(request: Request, record_id: str):
+    user = _current_user(request)
+    res = get_analysis(record_id, owner_id=user["id"]) if user else get_analysis(record_id)
     if res is None:
         raise HTTPException(status_code=404, detail="Report not found")
     pdf_bytes = render_pdf(res)
     headers = {"Content-Disposition": f'attachment; filename="truthlens-{record_id}.pdf"'}
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+
+
+@app.post("/history/{record_id}/delete")
+async def delete_history_record(
+    request: Request,
+    record_id: str,
+    csrf_token: str = Form(...),
+):
+    user = _current_user(request)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Log in to manage saved analyses")
+    if not _valid_csrf(request, csrf_token):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+    delete_analysis(record_id, user["id"])
+    return RedirectResponse("/history", status_code=303)

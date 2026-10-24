@@ -102,6 +102,14 @@
       .disclosure:not(.technical-shell){background:#ffffff03;border-radius:.55rem;margin:.45rem 0;border-color:#ffffff12}.disclosure:not(.technical-shell)>summary{padding:.64rem .75rem;font-size:.82rem}.disclosure:not(.technical-shell)>.disclosure-content{padding:0 .75rem .75rem}.summary-meta{flex-wrap:wrap;justify-content:flex-end}
       .details-section-title{font-size:.82rem;margin:.75rem 0 .4rem;color:#dce7f5}.frow{display:grid}.footer-note{padding:.25rem;font-size:.7rem}
       @media(max-width:640px){header{align-items:center}.header-file{order:3;width:100%;flex:auto;margin:.2rem 0 0}.nav-actions{order:2}.summary-top{align-items:flex-start;flex-direction:column}.score-block{justify-items:start}.score-label{text-align:left}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.stat{display:grid;gap:.12rem;padding:.5rem}.stat-value{font-size:1rem}.stat-label{font-size:.64rem}.check-list{grid-template-columns:repeat(2,minmax(0,1fr))}.summary-meta{justify-content:flex-start}}
+      .preview-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.55rem;padding:.7rem .85rem;background:#111a2b;border:1px solid var(--border);border-radius:.7rem}
+      .preview-frame{min-width:0;margin:0}.preview-frame img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:.4rem;background:#080d17}.preview-frame button{display:block;width:100%;padding:0;border:0;border-radius:.4rem;background:none;cursor:pointer}.preview-frame button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}.preview-frame figcaption{margin-top:.3rem;color:var(--muted);font-size:.7rem}
+      .evidence-list{display:grid;gap:.4rem}.evidence-row{display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.65rem .75rem;border-bottom:1px solid #ffffff12}.evidence-row:last-child{border-bottom:0}.evidence-label{font-size:.83rem;font-weight:650}.evidence-summary{color:var(--muted);font-size:.8rem;line-height:1.45;margin:.18rem 0 0}.evidence-state{flex:none;color:#b7c7da;font-size:.68rem;border:1px solid var(--border);border-radius:999px;padding:.16rem .45rem}
+      .summary .verdict{font-size:clamp(1.4rem,3vw,2rem)}.summary .score-note{margin:.65rem 0 0;max-width:660px}.main-warning{margin:.7rem 0 0}.evidence-overview{padding:.9rem 1rem}.disclosure-content .overview{margin:.75rem 0 0}
+      .file-summary{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;padding:.1rem .2rem}.file-name{font-size:.93rem;font-weight:650;overflow-wrap:anywhere}.file-meta{display:flex;gap:.75rem;flex-wrap:wrap;color:var(--muted);font-size:.75rem}
+      .readiness-card{display:grid;grid-template-columns:100px 1fr;align-items:center;gap:1rem;padding:.9rem 1rem;border:1px solid #ffffff18;border-radius:.7rem;background:#111a2b}.readiness-ring{--readiness:0%;position:relative;display:grid;place-items:center;width:88px;aspect-ratio:1;border-radius:50%;background:conic-gradient(#22d3ee var(--readiness),#ffffff18 0)}.readiness-ring:before{position:absolute;inset:6px;border-radius:50%;background:#111a2b;content:""}.readiness-number{position:relative;font-size:1.2rem;font-weight:700}.readiness-number small{font-size:.65rem;color:var(--muted)}.readiness-title{font-size:.95rem;margin:0}.readiness-label{margin:.18rem 0;color:#b9dff3;font-size:.8rem;font-weight:600}.readiness-note{color:var(--muted);font-size:.76rem;line-height:1.45;margin:.28rem 0 0}.readiness-factors{display:flex;gap:.35rem .85rem;flex-wrap:wrap;margin:.45rem 0 0;padding:0;list-style:none;color:var(--muted);font-size:.72rem}
+      .technical-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin:.6rem 0}.technical-actions .btn{margin:0}
+      @media(max-width:640px){.preview-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.evidence-row{align-items:flex-start}.readiness-card{grid-template-columns:76px 1fr;gap:.7rem;padding:.75rem}.readiness-ring{width:70px}.file-summary{align-items:flex-start;flex-direction:column}}
   </style>
 </head>
 <body>
@@ -124,56 +132,102 @@
 
   <header>
     <div class="brand"><div class="dot"></div><strong>TruthLens</strong></div>
-    <p class="header-file" title="{{ file.name or 'Unnamed video' }}">{{ file.name or 'Unnamed video' }}</p>
     <nav class="nav-actions" aria-label="Report navigation">
-      {% if id %}<a class="btn" href="/report/{{ id }}/pdf">Download PDF</a>{% endif %}
-      <a class="btn" href="/history">History</a>
+      {% if user %}<a class="btn" href="/history">My history</a><form action="/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn" type="submit">Log out</button></form>{% endif %}
       <a class="btn" href="/">Analyze another</a>
     </nav>
   </header>
   <main>
+    <section class="file-summary" aria-label="Analyzed video">
+      <span class="file-name" title="{{ file.name or 'Unnamed video' }}">{{ file.name or 'Unnamed video' }}</span>
+      <span class="file-meta">
+        {% if file.size_mb is defined %}<span>{{ file.size_mb }} MiB</span>{% endif %}
+        {% if timeline_meta.duration_sec %}<span>{{ timeline_meta.duration_sec }} s</span>{% endif %}
+        {% if timeline_meta.width and timeline_meta.height %}<span>{{ timeline_meta.width }} × {{ timeline_meta.height }}</span>{% endif %}
+      </span>
+    </section>
     <section class="summary" aria-labelledby="assessment-title">
       <div class="assessment-line"><p class="eyebrow" id="assessment-title">Video authenticity analysis</p><span class="complete-tag">ANALYSIS COMPLETE</span></div>
       <div class="summary-top">
         <div>
           <span class="verdict v-{{ verdict }}">{{ verdict_text }}</span>
+          <p class="score-note">{{ verdict_meaning }}</p>
         </div>
-        {% if overall_score is not none %}
-        <div class="score-block" aria-label="Uncalibrated detection score">
-          <span class="score">{{ overall_score }}%</span>
-          <span class="score-label">Uncalibrated detection score</span>
-        </div>
-        {% else %}
-        <div class="score-label">No single detection score shown for this inconclusive result</div>
-        {% endif %}
       </div>
-      <p class="score-note">Uncalibrated detection score; not a probability of AI-generation.</p>
-      <p class="warning"><strong>Screening result only.</strong> This result does not confirm that the video is authentic.</p>
-      {% if disagreement %}<p class="warning"><strong>Mixed signals:</strong> Checks disagree. {{ signals_analysed }} of {{ signals_total }} checks were available.</p>{% endif %}
-      {% if missing %}<p class="warning unavailable"><strong>Incomplete evidence:</strong> {{ missing|length }} of {{ signals_total }} checks unavailable or failed: {{ missing|join(', ') }}.</p>{% endif %}
-      <div class="stats" aria-label="Analysis summary statistics">
-        <div class="stat"><span class="stat-value">{{ signals_analysed }} / {{ signals_total }}</span><span class="stat-label">Checks available</span></div>
-        <div class="stat"><span class="stat-value">{{ timeline_meta.scored_frames if timeline_meta.scored_frames is not none else '—' }}</span><span class="stat-label">Sampled frames scored</span></div>
-        <div class="stat"><span class="stat-value">{% if timeline_meta.duration_sec %}{{ timeline_meta.duration_sec }} s{% else %}—{% endif %}</span><span class="stat-label">Video duration</span></div>
+      {% if disagreement %}<p class="warning main-warning"><strong>Mixed signals:</strong> Checks disagree; interpret this result cautiously.</p>{% endif %}
+      {% if missing %}<p class="warning unavailable main-warning">{{ missing|length }} of {{ signals_total }} checks unavailable or failed. Missing checks do not count as evidence.</p>{% endif %}
+      {% if history_warning %}<p class="warning main-warning">{{ history_warning }}</p>{% endif %}
+    </section>
+
+    <section class="readiness-card" aria-labelledby="readiness-title">
+      {% if readiness is defined and readiness.score is not none %}
+      <div class="readiness-ring" style="--readiness: {{ readiness.score }}%" role="img" aria-label="Readiness Score {{ readiness.score }} out of 100"><span class="readiness-number">{{ readiness.score }}<small>/100</small></span></div>
+      {% else %}<div class="readiness-ring" role="img" aria-label="Readiness Score unavailable"><span class="readiness-number">N/A</span></div>{% endif %}
+      <div>
+        <h2 class="readiness-title" id="readiness-title">Readiness Score</h2>
+        <p class="readiness-label">{{ readiness.label if readiness is defined else 'Unavailable' }}</p>
+        <p class="readiness-note">Evidence completeness for analysis, not likelihood of AI generation.</p>
+        {% if readiness is defined and readiness.factors %}<ul class="readiness-factors">{% for factor in readiness.factors %}<li>{{ factor }}</li>{% endfor %}</ul>{% endif %}
       </div>
     </section>
 
-    <section class="overview" aria-labelledby="overview-title">
-      <div class="overview-head"><h2 class="section-title" id="overview-title">Analysis breakdown</h2><span class="warning-note">Status of all six checks</span></div>
-      <div class="evidence-grid">
-        <div class="evidence-cell"><h3>Leans toward AI-generation</h3><div class="chips">{% if supporting %}{% for item in supporting %}<span class="chip">{{ item }}</span>{% endfor %}{% else %}<span class="empty-inline">No checks listed</span>{% endif %}</div></div>
-        <div class="evidence-cell"><h3>Leans away from AI-generation</h3><div class="chips">{% if contradicting %}{% for item in contradicting %}<span class="chip">{{ item }}</span>{% endfor %}{% else %}<span class="empty-inline">No checks listed</span>{% endif %}</div></div>
+    <section class="overview evidence-overview" aria-labelledby="overview-title">
+      <h2 class="section-title" id="overview-title">Key findings</h2>
+      <div class="evidence-list">
+        {% for f in findings if f.status == 'completed' and f.signal != 's6_semantic' %}
+          {% if loop.index <= 3 %}
+          <article class="evidence-row">
+            <div><div class="evidence-label">{{ f.label }}</div><p class="evidence-summary">{{ f.summary }}</p></div>
+            <span class="evidence-state">Available</span>
+          </article>
+          {% endif %}
+        {% else %}
+          <p class="warning-note">No supported signal findings are available for this analysis.</p>
+        {% endfor %}
       </div>
-      <div class="check-list" aria-label="Check availability">
-        {% for f in findings %}<span class="check-item"><span class="check-item-name">{{ f.label }}</span> <span class="status b-{{ f.status }}">{% if f.status == 'completed' %}available{% else %}{{ f.status.replace('_',' ') }}{% endif %}</span></span>{% endfor %}
-      </div>
-      <p class="warning-note">Signal directions are not independent confirmations.</p>
     </section>
+
+    {% set preview_frames = timeline|selectattr('preview')|list %}
+    {% if preview_frames %}
+    <section aria-labelledby="preview-title">
+      <h2 class="section-title" id="preview-title">Sampled frames</h2>
+      <div class="preview-strip">
+        {% for frame in preview_frames[:5] %}
+        <figure class="preview-frame">
+          {% if frame.frame is defined %}<button type="button" class="preview-frame-button" data-frame="{{ frame.frame }}" aria-label="Show analysis for sampled frame {{ frame.frame }}"><img src="{{ frame.preview }}" alt="Sampled video frame at {{ frame.t }} seconds"></button>
+          {% else %}<img src="{{ frame.preview }}" alt="Sampled video frame at {{ frame.t }} seconds">{% endif %}
+          <figcaption>{{ frame.t }}s{% if frame.frame is defined %} · Frame {{ frame.frame }}{% endif %}</figcaption>
+        </figure>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
 
     <details class="disclosure technical-shell">
-      <summary><span>Technical details</span><span class="summary-meta">Measurements, frame details, hash &amp; limitations</span></summary>
+      <summary><span>View technical details</span><span class="summary-meta">Measurements, frame details, hash &amp; limitations</span></summary>
       <div class="disclosure-content">
         <p class="technical-intro">Expand an item to inspect the measurements and explanations retained in the report.</p>
+        {% if overall_score is not none %}<p class="technical-intro">Uncalibrated detection score: <strong>{{ overall_score }}%</strong>. This is not a probability of AI-generation.</p>{% endif %}
+        {% if readiness is defined %}<p class="technical-intro">Readiness formula: {{ readiness.definition }}</p>{% endif %}
+        <div class="technical-actions">
+          {% if id %}<a class="btn" href="/report/{{ id }}/pdf">Download PDF</a>{% endif %}
+          <a class="btn" href="/history">History</a>
+        </div>
+        <div class="stats" aria-label="Analysis summary statistics">
+          <div class="stat"><span class="stat-value">{{ signals_analysed }} / {{ signals_total }}</span><span class="stat-label">Checks available</span></div>
+          <div class="stat"><span class="stat-value">{{ timeline_meta.scored_frames if timeline_meta.scored_frames is not none else '—' }}</span><span class="stat-label">Sampled frames scored</span></div>
+          <div class="stat"><span class="stat-value">{% if timeline_meta.duration_sec %}{{ timeline_meta.duration_sec }} s{% else %}—{% endif %}</span><span class="stat-label">Video duration</span></div>
+        </div>
+        <section class="overview" aria-label="All signal directions">
+          <div class="overview-head"><h2 class="section-title">All signal directions</h2><span class="warning-note">Signals are not independent confirmations.</span></div>
+          <div class="evidence-grid">
+            <div class="evidence-cell"><h3>Leans toward AI-generation</h3><div class="chips">{% if supporting %}{% for item in supporting %}<span class="chip">{{ item }}</span>{% endfor %}{% else %}<span class="empty-inline">None listed</span>{% endif %}</div></div>
+            <div class="evidence-cell"><h3>Leans away from AI-generation</h3><div class="chips">{% if contradicting %}{% for item in contradicting %}<span class="chip">{{ item }}</span>{% endfor %}{% else %}<span class="empty-inline">None listed</span>{% endif %}</div></div>
+          </div>
+          <div class="check-list" aria-label="Check availability">
+            {% for f in findings %}<span class="check-item"><span class="check-item-name">{{ f.label }}</span> <span class="status b-{{ f.status }}">{% if f.status == 'completed' %}available{% else %}{{ f.status.replace('_',' ') }}{% endif %}</span></span>{% endfor %}
+          </div>
+        </section>
     <details class="disclosure">
       <summary><span>1. Evidence timeline and sampled frames</span><span class="summary-meta">{{ timeline|length }} sampled</span></summary>
       <div class="disclosure-content">
@@ -231,7 +285,7 @@
         {% endfor %}
       </div>
     </details>
-    <p class="footer-note">TruthLens is an experimental screening aid. Treat results as one source of evidence, not a final determination.</p>
+    <p class="footer-note">Experimental screening only, not proof of authenticity. Compression, editing, video quality, and unsupported signals can affect results.</p>
   </main>
 
   <script>
@@ -284,6 +338,18 @@
       mark.addEventListener('click', function () { render(i); });
       mark.addEventListener('keydown', function (ev) {
         if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); render(i); }
+      });
+    });
+    document.querySelectorAll('.preview-frame-button').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var frameNumber = button.getAttribute('data-frame');
+        var index = marks.findIndex(function (mark) {
+          return mark.getAttribute('data-frame') === frameNumber;
+        });
+        if (index < 0) return;
+        document.querySelector('.technical-shell').open = true;
+        render(index);
+        track.scrollIntoView({ block: 'center', behavior: 'smooth' });
       });
     });
     document.getElementById('tlPrev').addEventListener('click', function () {

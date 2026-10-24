@@ -35,6 +35,20 @@ Open http://127.0.0.1:8000
 - `/history` case history
 - `/report/{id}` reopen a saved report
 - `/report/{id}/pdf` download the PDF report
+- `/register`, `/login`, and `/logout` manage optional accounts. Guests can analyze videos without registering; signed-in analyses are kept in a private, owner-scoped history.
+
+### Session configuration
+
+Set a stable random session secret before starting the app. The cookie is signed,
+HTTP-only, and SameSite=Lax. Enable `TRUTHLENS_HTTPS_ONLY=1` when serving over
+HTTPS. If no secret is set, a temporary process secret is generated and sessions
+will be invalidated when the app restarts.
+
+```powershell
+$env:TRUTHLENS_SESSION_SECRET = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$env:TRUTHLENS_HTTPS_ONLY = "0" # Set to "1" behind HTTPS
+uvicorn truthlens.api.main:app --host 127.0.0.1 --port 8000
+```
 
 ## Detector
 

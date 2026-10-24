@@ -1,3 +1,5 @@
+import re
+
 from fastapi.testclient import TestClient
 
 from truthlens.api import main
@@ -8,11 +10,256 @@ client = TestClient(app)
 def test_index_ok():
     r = client.get("/")
     assert r.status_code == 200
-    assert "uncalibrated detection score" in r.text
-    assert "not the probability" in r.text
-    assert "No AV synchronization check" in r.text
-    assert "Not implemented" in r.text
-    assert "AI probability" not in r.text
+    assert "Understand the signals behind a video's authenticity." in r.text
+    assert "MP4, WebM, MOV" in r.text
+    assert "Up to 100 MiB" in r.text
+    assert "Analyze Video" in r.text
+    assert "Experimental AI-video screening. Results are not proof of authenticity." in r.text
+
+
+def test_readiness_measures_evidence_coverage_not_ai_score():
+    from truthlens.inference.report import calculate_readiness
+
+    signals = [
+        {"key": key, "status": "completed", "score": 99.0}
+        for key in ("s1_frame", "s2_temporal", "s3_freq", "s5_meta")
+    ]
+
+    readiness = calculate_readiness(
+        signals,
+        {"requested_frames": 8, "scored_frames": 6, "duration_sec": 8},
+    )
+
+    assert readiness["score"] == 88
+    assert readiness["label"] == "Good analysis readiness"
+    assert readiness["factors"] == [
+        "6 of 8 target frames scored.",
+        "4 of 4 core checks completed.",
+    ]
+
+
+def test_readiness_is_unavailable_when_measurements_are_missing():
+    from truthlens.inference.report import calculate_readiness
+
+    readiness = calculate_readiness([], {})
+
+    assert readiness["score"] is None
+    assert readiness["label"] == "Unavailable"
+
+
+def test_readiness_labels_limited_and_insufficient_evidence():
+    from truthlens.inference.report import calculate_readiness
+
+    signals = [
+        {"key": "s1_frame", "status": "completed"},
+        {"key": "s2_temporal", "status": "completed"},
+        {"key": "s3_freq", "status": "failed"},
+        {"key": "s5_meta", "status": "not_available"},
+    ]
+    limited = calculate_readiness(
+        signals,
+        {"requested_frames": 8, "scored_frames": 4, "duration_sec": 8},
+    )
+    insufficient = calculate_readiness(
+        [{"key": signal["key"], "status": "failed"} for signal in signals],
+        {"requested_frames": 8, "scored_frames": 0, "duration_sec": 8},
+    )
+
+    assert limited["score"] == 50
+    assert limited["label"] == "Limited evidence"
+    assert insufficient["score"] == 0
+    assert insufficient["label"] == "Insufficient evidence"
+
+
+def test_registration_login_logout_and_owned_history(monkeypatch, tmp_path):
+    from truthlens.inference import store
+    from truthlens.inference.report import build_result
+
+    monkeypatch.setattr(store, "DB_PATH", tmp_path / "auth-test.db")
+    monkeypatch.setattr(
+        main,
+        "run_pipeline",
+        lambda _path, filename=None: build_result([], 50.0, file_meta={"name": filename}),
+    )
+    monkeypatch.setattr(main, "render_pdf", lambda _result: b"%PDF-owned")
+    auth_client = TestClient(app, follow_redirects=False)
+
+    registration_page = auth_client.get("/register")
+    csrf = re.search(r'name="csrf_token" value="([^"]+)"', registration_page.text).group(1)
+    registered = auth_client.post(
+        "/register",
+        data={
+            "email": "Person@Example.com",
+            "password": "very-secure-test-password",
+            "csrf_token": csrf,
+        },
+    )
+    assert registered.status_code == 303
+    assert registered.headers["location"] == "/history"
+    signed_in_page = auth_client.get("/")
+    csrf = re.search(r'name="csrf_token" value="([^"]+)"', signed_in_page.text).group(1)
+
+    owner_id = store.get_user_by_email("person@example.com")["id"]
+    other_id = store.create_user("other@example.com", "not-a-real-hash")
+    analysis_response = auth_client.post(
+        "/analyze",
+        data={"csrf_token": csrf},
+        files={"video": ("owned.mp4", b"video bytes", "video/mp4")},
+    )
+    assert analysis_response.status_code == 200
+    assert "Readiness Score" in analysis_response.text
+    record_id = store.list_analyses(owner_id=owner_id)[0]["id"]
+    foreign_id = store.save_analysis(
+        build_result([], 50.0, file_meta={"name": "private.mp4"}),
+        owner_id=other_id,
+    )
+
+    history_response = auth_client.get("/history")
+    assert "owned.mp4" in history_response.text
+    assert "private.mp4" not in history_response.text
+    csrf = re.search(r'name="csrf_token" value="([^"]+)"', history_response.text).group(1)
+    owned_report = auth_client.get(f"/report/{record_id}")
+    assert owned_report.status_code == 200
+    assert 'href="/report/' + record_id + '/pdf"' in owned_report.text
+    assert auth_client.get(f"/report/{foreign_id}").status_code == 404
+    assert auth_client.get(f"/report/{foreign_id}").status_code == 404
+    assert auth_client.get(f"/report/{foreign_id}/pdf").status_code == 404
+
+    delete_foreign = auth_client.post(
+        f"/history/{foreign_id}/delete",
+        data={"csrf_token": csrf},
+    )
+    assert delete_foreign.status_code == 303
+    assert store.get_analysis(foreign_id, owner_id=other_id) is not None
+
+    delete_owned = auth_client.post(
+        f"/history/{record_id}/delete",
+        data={"csrf_token": csrf},
+    )
+    assert delete_owned.status_code == 303
+    assert store.get_analysis(record_id, owner_id=owner_id) is None
+
+    auth_client.post("/logout", data={"csrf_token": csrf})
+    login_page = auth_client.get("/login")
+    login_csrf = re.search(r'name="csrf_token" value="([^"]+)"', login_page.text).group(1)
+    login_response = auth_client.post(
+        "/login",
+        data={
+            "email": "person@example.com",
+            "password": "very-secure-test-password",
+            "csrf_token": login_csrf,
+        },
+    )
+    assert login_response.status_code == 303
+    assert auth_client.get("/history").status_code == 200
+
+
+def test_auth_requires_csrf_and_valid_password(monkeypatch, tmp_path):
+    from truthlens.inference import store
+
+    monkeypatch.setattr(store, "DB_PATH", tmp_path / "csrf-test.db")
+    auth_client = TestClient(app, follow_redirects=False)
+    response = auth_client.post(
+        "/register",
+        data={
+            "email": "valid@example.com",
+            "password": "very-secure-test-password",
+            "csrf_token": "bad",
+        },
+    )
+    assert response.status_code == 400
+    assert store.get_user_by_email("valid@example.com") is None
+
+    page = auth_client.get("/register")
+    csrf = re.search(r'name="csrf_token" value="([^"]+)"', page.text).group(1)
+    weak_password = auth_client.post(
+        "/register",
+        data={"email": "valid@example.com", "password": "short", "csrf_token": csrf},
+    )
+    assert weak_password.status_code == 400
+    assert store.get_user_by_email("valid@example.com") is None
+
+
+def test_login_rate_limit(monkeypatch, tmp_path):
+    from truthlens.inference import store
+
+    monkeypatch.setattr(store, "DB_PATH", tmp_path / "login-limit.db")
+    auth_client = TestClient(app, follow_redirects=False)
+    page = auth_client.get("/login")
+    csrf = re.search(r'name="csrf_token" value="([^"]+)"', page.text).group(1)
+    payload = {
+        "email": "rate-limit@example.com",
+        "password": "incorrect-password",
+        "csrf_token": csrf,
+    }
+
+    responses = [auth_client.post("/login", data=payload) for _ in range(8)]
+
+    assert all(response.status_code == 401 for response in responses)
+    assert auth_client.post("/login", data=payload).status_code == 429
+
+
+def test_database_migration_preserves_guest_history(monkeypatch, tmp_path):
+    import sqlite3
+
+    from truthlens.inference import store
+    from truthlens.inference.report import build_result
+
+    db_path = tmp_path / "legacy.db"
+    monkeypatch.setattr(store, "DB_PATH", db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "CREATE TABLE analyses (id TEXT PRIMARY KEY, filename TEXT, size_bytes INTEGER, "
+            "sha256 TEXT, created_at TEXT, verdict TEXT, ai_probability REAL, status TEXT, "
+            "result_json TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO analyses VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "legacy-id",
+                "legacy.mp4",
+                12,
+                "hash",
+                "2026-01-01T00:00:00+00:00",
+                "inconclusive",
+                50.0,
+                "completed",
+                '{"id":"legacy-id"}',
+            ),
+        )
+
+    migrated = store.list_analyses()
+    assert len(migrated) == 1
+    assert migrated[0]["id"] == "legacy-id"
+    assert store.get_analysis("legacy-id")["id"] == "legacy-id"
+
+    owner_id = store.create_user("migration@example.com", "scrypt-test")
+    owned_id = store.save_analysis(
+        build_result([], 50.0, file_meta={"name": "new.mp4"}), owner_id=owner_id
+    )
+    assert [record["id"] for record in store.list_analyses(owner_id=owner_id)] == [owned_id]
+    assert store.get_analysis(owned_id) is None
+
+
+def test_analysis_remains_visible_when_history_save_fails(monkeypatch):
+    from truthlens.inference.report import build_result
+
+    monkeypatch.setattr(
+        main,
+        "run_pipeline",
+        lambda _path, filename=None: build_result([], 50.0, file_meta={"name": filename}),
+    )
+    monkeypatch.setattr(main, "save_analysis", lambda *_args, **_kwargs: "")
+
+    response = client.post(
+        "/analyze",
+        files={"video": ("not-stored.mp4", b"video bytes", "video/mp4")},
+    )
+
+    assert response.status_code == 200
+    assert "not-stored.mp4" in response.text
+    assert "could not be saved to history" in response.text
+    assert 'href="/report/' not in response.text
 
 
 def test_report_renders_mixed_and_unavailable_evidence(monkeypatch):
@@ -36,7 +283,11 @@ def test_report_renders_mixed_and_unavailable_evidence(monkeypatch):
                     }
                 ],
                 "video": {"duration_sec": 8.0, "fps": 24, "total_frames": 192},
-                "sampling": {"scored_frames": 1, "sampled_times": [0.0]},
+                    "sampling": {
+                        "requested_frames": 1,
+                        "scored_frames": 1,
+                        "sampled_times": [0.0],
+                    },
             },
         },
         {
@@ -84,7 +335,13 @@ def test_report_renders_mixed_and_unavailable_evidence(monkeypatch):
     assert response.status_code == 200
     assert "mixed-demo.mp4" in response.text
     assert "Mixed signals" in response.text
-    assert "Incomplete evidence" in response.text
+    assert "checks unavailable or failed" in response.text
+    assert "View technical details" in response.text
+    assert "Readiness Score" in response.text
+    assert "Evidence completeness for analysis, not likelihood of AI generation." in response.text
+    assert "Key findings" in response.text
+    assert result["readiness"]["score"] == 56
+    assert result["readiness"]["label"] == "Limited evidence"
     assert "not available" in response.text
     assert "Uncalibrated detection score" in response.text
     assert "data:image/jpeg;base64,dGVzdA==" in response.text
@@ -131,7 +388,7 @@ def test_history_route_still_lists_and_links_saved_reports(monkeypatch):
 
 
 def test_pdf_download_route_still_returns_pdf(monkeypatch):
-    monkeypatch.setattr(main, "get_analysis", lambda _record_id: {"id": "pdf-demo"})
+    monkeypatch.setattr(main, "get_analysis", lambda _record_id, owner_id=None: {"id": "pdf-demo"})
     monkeypatch.setattr(main, "render_pdf", lambda _result: b"%PDF-demo")
 
     response = client.get("/report/pdf-demo/pdf")

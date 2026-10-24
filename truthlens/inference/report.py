@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 
-from truthlens.config import thresholds
+from truthlens.config import get_config, thresholds
 from truthlens.inference.findings import SIGNAL_LABELS, build_all_findings
 
 DETECTOR_VERSION = "0.2.0"
@@ -54,6 +55,62 @@ LIMITATIONS = [
     "against the AI hypothesis - it is not a confirmation that the video is "
     "authentic.",
 ]
+
+READINESS_CORE_SIGNALS = ("s1_frame", "s2_temporal", "s3_freq", "s5_meta")
+READINESS_DEFINITION = (
+    "50% frame coverage against max(requested frames, duration times configured target FPS) "
+    "plus 50% completion of frame, temporal, "
+    "frequency, and metadata checks; labels are good at 80+, limited at 50-79, "
+    "and insufficient below 50."
+)
+
+
+def calculate_readiness(signals: list[dict], timeline_meta: dict) -> dict:
+    """Score evidence coverage: 50% frame decoding and 50% core-check completion."""
+    status_by_key = {signal.get("key"): signal.get("status") for signal in signals}
+    requested = timeline_meta.get("requested_frames")
+    scored = timeline_meta.get("scored_frames")
+    duration = timeline_meta.get("duration_sec")
+    target_fps = get_config().get("target_fps_sample")
+    if (
+        requested is None
+        or scored is None
+        or duration is None
+        or target_fps is None
+        or requested <= 0
+        or duration <= 0
+        or target_fps <= 0
+        or not all(key in status_by_key for key in READINESS_CORE_SIGNALS)
+    ):
+        return {
+            "score": None,
+            "label": "Unavailable",
+            "definition": READINESS_DEFINITION,
+            "factors": ["Required frame-sampling or core-check data was not reported."],
+        }
+
+    target_frames = max(float(requested), float(duration) * float(target_fps))
+    frame_ratio = min(max(float(scored) / target_frames, 0.0), 1.0)
+    completed = sum(status_by_key[key] == "completed" for key in READINESS_CORE_SIGNALS)
+    score = round(50 * frame_ratio + 50 * completed / len(READINESS_CORE_SIGNALS))
+    expected_frames = math.ceil(target_frames)
+    label = (
+        "Good analysis readiness"
+        if score >= 80
+        else "Limited evidence" if score >= 50 else "Insufficient evidence"
+    )
+    return {
+        "score": score,
+        "label": label,
+        "definition": READINESS_DEFINITION,
+        "factors": [
+            (
+                f"{min(max(int(scored), 0), expected_frames)} of {expected_frames} "
+                "target frames scored."
+            ),
+            f"{completed} of {len(READINESS_CORE_SIGNALS)} core checks completed.",
+        ],
+    }
 
 
 def sha256_file(path: str | Path, chunk: int = 1024 * 1024) -> str:
@@ -180,6 +237,7 @@ def build_result(
             break
 
     findings = build_all_findings(scores)
+    readiness = calculate_readiness(signals, timeline_meta)
 
     limitations = list(LIMITATIONS)
     for s in signals:
@@ -202,6 +260,7 @@ def build_result(
         "signals_analysed": len(completed),
         "signals_total": len(signals),
         "signals": signals,
+        "readiness": readiness,
         "findings": findings,
         "timeline": timeline,
         "timeline_meta": timeline_meta,

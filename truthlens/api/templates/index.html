@@ -6,112 +6,357 @@
   <title>TruthLens - AI Video Detector</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: radial-gradient(1200px 800px at 50% -10%, #1f2937, #0b1020);
+      --bg: radial-gradient(1400px 900px at 50% -20%, #1f2937, #0b1020);
       --card: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
       --border: rgba(255,255,255,0.12);
       --text: #e5e7eb;
       --muted: #9ca3af;
-      --accent: linear-gradient(90deg, #22d3ee, #a78bfa, #22c55e);
+      --accent: linear-gradient(90deg, #22d3ee, #a78bfa);
     }
     * { box-sizing: border-box; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
     body { margin: 0; background: var(--bg); color: var(--text); min-height: 100dvh; }
     header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; }
     .brand { display: flex; gap: .75rem; align-items: center; }
     .dot { width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #fff, #22d3ee); box-shadow: 0 0 40px 6px rgba(34,211,238,.25); }
-    nav a { color: var(--muted); text-decoration: none; margin-left: 1rem; }
+    .brand-text { display: grid; gap: 0; }
+    .brand-name { font-weight: 600; line-height: 1.1; }
+    .brand-tag { font-size: .8rem; color: var(--muted); line-height: 1.1; }
+    nav a { color: var(--muted); text-decoration: none; margin-left: 1rem; font-size: .9rem; }
     nav a:hover { color: var(--text); }
-    main { max-width: 920px; margin: 0 auto; padding: 2rem; display: grid; gap: 1.25rem; }
-    .hero { text-align: center; display: grid; gap: .75rem; }
-    .title { font-size: clamp(2rem, 4vw, 4rem); margin: 0; font-weight: 600; letter-spacing: -.02em; }
-    .subtitle { color: var(--muted); margin: 0; }
-    .card { backdrop-filter: blur(12px); background: var(--card); border: 1px solid var(--border); border-radius: 1rem; padding: clamp(1rem, 2vw, 2rem); box-shadow: 0 40px 120px -60px rgba(168,85,247,.5); }
-    .upload { display: grid; gap: 1rem; align-items: center; justify-items: center; text-align: center; }
-    .dropzone { border: 1px dashed var(--border); border-radius: .75rem; padding: 2rem; width: min(720px, 100%); display: grid; gap: .5rem; }
-    .btn { position: relative; display: inline-flex; gap: .5rem; align-items: center; padding: .9rem 1.4rem; border-radius: .7rem; border: 1px solid var(--border); background: linear-gradient(90deg, rgba(34,211,238,.18), rgba(167,139,250,.18)); color: var(--text); cursor: pointer; font-weight: 600; }
-    .btn:before { content: ""; position: absolute; inset: 0; padding: 1px; border-radius: inherit; background: var(--accent); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+    .nav-link { padding: 0; border: 0; background: transparent; color: var(--muted); font-size: .9rem; cursor: pointer; }
+    .nav-link:hover { color: var(--text); }
+    .nav-link:focus-visible { outline: 3px solid #22d3ee; outline-offset: 3px; }
+    main { max-width: 880px; margin: 0 auto; padding: clamp(2rem, 6vw, 5rem) 1.5rem; display: grid; gap: 2rem; justify-items: center; text-align: center; }
+    .hero { display: grid; gap: .9rem; justify-items: center; }
+    .logo { display: flex; gap: .9rem; align-items: center; }
+    .logo-dot { width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #fff, #22d3ee); box-shadow: 0 0 60px 10px rgba(34,211,238,.22); }
+    .logo-text { font-size: clamp(2.8rem, 8vw, 5.2rem); font-weight: 600; letter-spacing: -.03em; margin: 0; }
+    .tagline { color: var(--muted); margin: 0; font-size: clamp(1rem, 2vw, 1.15rem); }
+    .card { width: min(760px, 100%); backdrop-filter: blur(14px); background: var(--card); border: 1px solid var(--border); border-radius: 1.1rem; padding: clamp(1.2rem, 4vw, 3rem); box-shadow: 0 60px 140px -80px rgba(167,139,250,.6); display: grid; gap: 1.4rem; justify-items: center; }
+    .upload { display: grid; gap: 1.2rem; justify-items: center; width: 100%; }
+    .dropzone { border: 1px dashed rgba(255,255,255,0.18); border-radius: .9rem; padding: clamp(2rem, 6vw, 4rem); width: 100%; display: grid; gap: .6rem; justify-items: center; transition: border-color .2s ease, background .2s ease; }
+    .dropzone.active { border-color: rgba(34,211,238,.9); background: radial-gradient(600px 200px at 50% 0%, rgba(34,211,238,.12), transparent); }
+    .dropzone-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle, rgba(34,211,238,.25), transparent); border: 1px solid rgba(34,211,238,.45); }
+    .dropzone-title { font-size: clamp(1.1rem, 2vw, 1.4rem); font-weight: 600; }
+    .dropzone-subtitle { color: var(--muted); font-size: .95rem; }
     input[type=file] { display: none; }
-    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
-    .feature { border: 1px solid var(--border); border-radius: .75rem; padding: 1rem; background: rgba(255,255,255,0.02); }
-    .feature h3 { margin: .25rem 0; }
-    .feature p { margin: 0; color: var(--muted); font-size: .95rem; }
-    .error { border: 1px solid rgba(248,113,113,.55); background: rgba(239,68,68,.12); border-radius: .65rem; padding: .85rem 1rem; color: #fecaca; }
-    footer { text-align: center; color: var(--muted); padding: 2rem; }
+    .btn { position: relative; display: inline-flex; gap: .6rem; align-items: center; padding: .95rem 2.4rem; border-radius: 999px; border: 1px solid transparent; background: radial-gradient(circle, rgba(255,255,255,.12), transparent), linear-gradient(90deg, #22d3ee, #a78bfa); color: #0b1020; font-weight: 600; text-decoration: none; cursor: pointer; box-shadow: 0 40px 80px -60px rgba(34,211,238,.9); }
+    .btn span { position: relative; z-index: 1; }
+    .selected-file { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 1rem; align-items: center; width: 100%; text-align: left; }
+    .selected-file[hidden], .upload-status[hidden], .progress-track[hidden], .status-actions button[hidden], .spinner[hidden] { display: none; }
+    .selected-file video { display: block; width: 100%; max-height: 150px; aspect-ratio: 16 / 9; object-fit: contain; background: #070b14; border: 1px solid var(--border); border-radius: .6rem; }
+    .selected-name { margin: 0; overflow-wrap: anywhere; font-weight: 600; }
+    .selected-size { color: var(--muted); font-size: .85rem; margin: .35rem 0 0; }
+    .upload-status { width: 100%; border: 1px solid var(--border); border-radius: .7rem; padding: .85rem 1rem; text-align: left; background: rgba(255,255,255,.035); }
+    .status-head { display: flex; align-items: center; gap: .8rem; }
+    .status-head .spinner { width: 24px; height: 24px; flex: none; border-width: 3px; margin: 0; }
+    .status-title { margin: 0; font-weight: 600; }
+    .status-detail { margin: .2rem 0 0; color: var(--muted); font-size: .85rem; }
+    .upload-status.is-error { border-color: rgba(248,113,113,.55); background: rgba(239,68,68,.08); }
+    .progress-track { height: 7px; overflow: hidden; margin-top: .75rem; border-radius: 99px; background: rgba(255,255,255,.1); }
+    .progress-fill { width: 35%; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#22d3ee,#a78bfa); transition: width .15s linear; }
+    .progress-fill.indeterminate { animation: progress 1.1s ease-in-out infinite alternate; }
+    .status-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+    .status-actions .btn { padding: .55rem .85rem; }
+    .btn:disabled { cursor: wait; opacity: .65; }
+    .dropzone:focus-visible, .btn:focus-visible { outline: 3px solid #22d3ee; outline-offset: 3px; }
+    .disclaimer { color: var(--muted); font-size: .9rem; }
+    .error { border: 1px solid rgba(248,113,113,.6); background: rgba(239,68,68,.14); border-radius: .7rem; padding: .8rem 1rem; color: #fecaca; width: 100%; }
+    .spinner { width: 58px; height: 58px; border-radius: 50%; border: 4px solid rgba(255,255,255,.12); border-top-color: #22d3ee; margin: 0 auto 1rem; animation: spin 1s linear infinite; }
+    footer { text-align: center; color: var(--muted); padding: 2rem 1rem; font-size: .9rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes progress { from { transform: translateX(-80%); } to { transform: translateX(190%); } }
+    @media (max-width: 640px) {
+      header { flex-direction: column; align-items: flex-start; gap: .8rem; }
+      nav { display: flex; flex-wrap: wrap; gap: .8rem; }
+      nav a { margin-left: 0; }
+      .selected-file { grid-template-columns: 1fr; }
+      .selected-file video { max-height: 220px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
   </style>
 </head>
 <body>
   <header>
-    <div class="brand"><div class="dot"></div><strong>TruthLens</strong></div>
-    <nav><a href="#features">Features</a><a href="/history">History</a><a href="https://github.com/anomalyco/truthlens" target="_blank" rel="noreferrer">GitHub</a><a href="#how">How it works</a><a href="#signals">Signals</a></nav>
+    <div class="brand">
+      <div class="dot"></div>
+      <div class="brand-text">
+        <span class="brand-name">TruthLens</span>
+        <span class="brand-tag">AI Video Detector</span>
+      </div>
+    </div>
+    <nav>
+      <a href="/history">History</a>
+      {% if user %}
+      <span class="brand-tag">{{ user.email }}</span>
+      <form action="/logout" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="nav-link" type="submit">Log out</button></form>
+      {% else %}<a href="/login">Log in</a><a href="/register">Create account</a>{% endif %}
+      <a href="https://github.com/anomalyco/truthlens" target="_blank" rel="noreferrer">GitHub</a>
+    </nav>
   </header>
   <main>
     <section class="hero">
-      <h1 class="title">Explore video forensic signals</h1>
-      <p class="subtitle">An experimental screening tool that summarizes sampled evidence—not a proof of authenticity.</p>
+      <div class="logo">
+        <div class="logo-dot"></div>
+        <h1 class="logo-text">TruthLens</h1>
+      </div>
+      <p class="tagline">Understand the signals behind a video's authenticity.</p>
     </section>
     <section class="card">
       <form class="upload" id="analyzeForm" action="/analyze" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" id="csrfToken" value="{{ csrf_token }}">
         {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
-        <div class="dropzone" id="dropzone">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
-          <div><strong>Drop videos</strong> or click to upload</div>
-          <div class="subtitle">MP4, WebM, MOV · Up to 100 MiB per video · Up to 5 videos per batch (250 MiB total)</div>
+        <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Choose a video or drag it here">
+          <div class="dropzone-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
+            </svg>
+          </div>
+          <div class="dropzone-title">Choose a video or drag it here</div>
+          <div class="dropzone-subtitle">MP4, WebM, MOV · Up to 100 MiB</div>
         </div>
-        <input id="file" type="file" name="video" accept=".mp4,.webm,.mov" multiple required>
-        <div id="filelist" class="subtitle"></div>
-        <button class="btn" id="submitBtn" type="submit">Analyze Video</button>
+        <input id="file" type="file" name="video" accept=".mp4,.webm,.mov" multiple>
+        <div class="selected-file" id="selectedFile" hidden>
+          <video id="videoPreview" muted playsinline controls preload="metadata" aria-label="Selected video preview"></video>
+          <div><p class="selected-name" id="fileName"></p><p class="selected-size" id="fileSize"></p></div>
+        </div>
+        <button class="btn" id="selectBtn" type="button"><span>Upload or Analyze Video</span></button>
+        <div class="upload-status" id="statusPanel" role="status" aria-live="polite" hidden>
+          <div class="status-head">
+            <div class="spinner" id="statusSpinner" hidden aria-hidden="true"></div>
+            <div><p class="status-title" id="statusTitle"></p><p class="status-detail" id="statusDetail"></p></div>
+          </div>
+          <div class="progress-track" id="progressTrack" role="progressbar" aria-label="Video upload progress" aria-valuemin="0" aria-valuemax="100" hidden><div class="progress-fill indeterminate" id="progressFill"></div></div>
+          <div class="status-actions">
+            <button class="btn" id="retryBtn" type="button" hidden>Retry upload</button>
+            <button class="btn" id="replaceBtn" type="button" hidden>Choose another video</button>
+            <button class="btn" id="cancelBtn" type="button" hidden>Cancel upload</button>
+          </div>
+        </div>
+        <div class="disclaimer">Experimental AI-video screening. Results are not proof of authenticity.</div>
       </form>
     </section>
-    <div id="overlay" style="display:none;position:fixed;inset:0;background:rgba(4,8,20,.72);backdrop-filter:blur(4px);z-index:50;place-items:center;text-align:center">
-      <div>
-        <div class="spinner" style="width:54px;height:54px;border:4px solid rgba(255,255,255,.15);border-top-color:#22d3ee;border-radius:50%;margin:0 auto 1rem;animation:spin 1s linear infinite"></div>
-        <div id="overlayText" style="font-size:1.1rem">Analyzing…</div>
-        <div class="subtitle" style="margin-top:.4rem">Running forensic signals — this can take a few seconds.</div>
-      </div>
-    </div>
-    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-    <section class="card" id="how">
-      <h2>How it works</h2>
-      <p class="subtitle">TruthLens samples frames and combines available forensic checks into an uncalibrated detection score and a cautious verdict. The score is not the probability that a video is AI-generated.</p>
-      <div class="features">
-        <article class="feature"><h3>Upload</h3><p>Upload MP4, WebM, or MOV. Each file may be up to 100 MiB; batches allow up to 5 files and 250 MiB total.</p></article>
-        <article class="feature"><h3>Analyze</h3><p>Inspect sampled frames, frame-to-frame motion, spatial-frequency statistics, audio features, and container metadata where available.</p></article>
-        <article class="feature"><h3>Understand</h3><p>Review the detection score, cautious verdict, checks that ran, raw measurements, and known limitations.</p></article>
-      </div>
-    </section>
-    <section class="features" id="signals">
-      <article class="feature"><h3>Sampled-frame analysis</h3><p>A frame model may run when its assets load; otherwise the app falls back to a face-presence heuristic, which is not a manipulation detector.</p></article>
-      <article class="feature"><h3>Temporal statistics</h3><p>Optical-flow magnitude and frame-difference variance; experimental hand-tuned values without validated directional thresholds.</p></article>
-      <article class="feature"><h3>Spatial-frequency statistics</h3><p>FFT-based image measurements; experimental and sensitive to resizing, compression, and camera noise.</p></article>
-      <article class="feature"><h3>Audio features</h3><p>MFCC, zero-crossing-rate, and spectral-flatness statistics when audio tools and a track are available. No AV synchronization check.</p></article>
-      <article class="feature"><h3>Container metadata</h3><p>A weak rule based on metadata tags; tags may be absent from ordinary re-encoded videos.</p></article>
-      <article class="feature"><h3>Semantic check</h3><p>Not implemented; reported as unavailable and excluded from the verdict.</p></article>
-    </section>
   </main>
-  <footer>Experimental screening only • Results can be wrong and are not proof of authenticity</footer>
+  <footer>TruthLens · Experimental screening only · Results can be wrong</footer>
   <script>
     const dz = document.getElementById('dropzone');
     const file = document.getElementById('file');
-    const filelist = document.getElementById('filelist');
     const form = document.getElementById('analyzeForm');
-    const overlay = document.getElementById('overlay');
-    const overlayText = document.getElementById('overlayText');
-    function updateList(){
-      const n = file.files ? file.files.length : 0;
-      filelist.textContent = n ? (n === 1 ? file.files[0].name : n + ' files selected') : '';
+    const selectBtn = document.getElementById('selectBtn');
+    const selectedFileCard = document.getElementById('selectedFile');
+    const videoPreview = document.getElementById('videoPreview');
+    const statusPanel = document.getElementById('statusPanel');
+    const statusTitle = document.getElementById('statusTitle');
+    const statusDetail = document.getElementById('statusDetail');
+    const statusSpinner = document.getElementById('statusSpinner');
+    const progressTrack = document.getElementById('progressTrack');
+    const progressFill = document.getElementById('progressFill');
+    const retryBtn = document.getElementById('retryBtn');
+    const replaceBtn = document.getElementById('replaceBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const maxUploadBytes = 100 * 1024 * 1024;
+    const maxBatchBytes = 250 * 1024 * 1024;
+    let selectedVideos = [];
+    let previewUrl = null;
+    let activeRequest = null;
+    let isSubmitting = false;
+    let uploadComplete = false;
+    let selectedIsValid = false;
+
+    function setStatus(title, detail, state) {
+      statusPanel.hidden = false;
+      statusPanel.classList.toggle('is-error', state === 'error');
+      statusPanel.setAttribute('role', state === 'error' ? 'alert' : 'status');
+      statusTitle.textContent = title;
+      statusDetail.textContent = detail || '';
+      statusSpinner.hidden = state !== 'loading';
+      progressTrack.hidden = state !== 'uploading';
+      retryBtn.hidden = state !== 'error' || !selectedVideos.length || !selectedIsValid;
+      replaceBtn.hidden = state === 'loading' || state === 'uploading';
+      cancelBtn.hidden = state !== 'uploading';
     }
-    file.addEventListener('change', updateList);
-    form.addEventListener('submit', ()=>{
-      const n = file.files ? file.files.length : 0;
-      overlayText.textContent = n > 1 ? ('Analyzing ' + n + ' videos…') : 'Analyzing…';
-      overlay.style.display = 'grid';
+
+    function setBusy(busy) {
+      isSubmitting = busy;
+      selectBtn.disabled = busy;
+      file.disabled = busy;
+      dz.setAttribute('aria-disabled', String(busy));
+    }
+
+    function formatSize(bytes) {
+      return bytes < 1024 * 1024
+        ? Math.max(1, Math.round(bytes / 1024)) + ' KB'
+        : (bytes / (1024 * 1024)).toFixed(1) + ' MiB';
+    }
+
+    function chooseFile() {
+      if (!isSubmitting) {
+        file.click();
+      }
+    }
+
+    function clearPreview() {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+      }
+      videoPreview.removeAttribute('src');
+      videoPreview.load();
+      selectedFileCard.hidden = true;
+    }
+
+    function showSelection(videos) {
+      selectedVideos = videos;
+      const video = videos[0];
+      const totalSize = videos.reduce((sum, item) => sum + item.size, 0);
+      document.getElementById('fileName').textContent = videos.length === 1
+        ? video.name
+        : videos.length + ' videos selected';
+      document.getElementById('fileSize').textContent = formatSize(totalSize);
+      clearPreview();
+      previewUrl = URL.createObjectURL(video);
+      videoPreview.src = previewUrl;
+      selectedFileCard.hidden = false;
+      selectBtn.querySelector('span').textContent = 'Choose another video';
+      setStatus(
+        videos.length === 1 ? 'Video selected. Preparing upload...' : 'Videos selected. Preparing upload...',
+        'Analysis will begin automatically after upload.',
+        'loading'
+      );
+      window.setTimeout(() => {
+        if (selectedVideos === videos && !isSubmitting) {
+          submitVideos(videos);
+        }
+      }, 60);
+    }
+
+    function showError(title, message) {
+      setBusy(false);
+      setStatus(title, message, 'error');
+    }
+
+    function submitVideos(videos) {
+      if (!videos.length || isSubmitting) return;
+      setBusy(true);
+      uploadComplete = false;
+      progressFill.classList.add('indeterminate');
+      progressFill.style.width = '35%';
+      progressTrack.removeAttribute('aria-valuenow');
+      setStatus('Uploading your video...', 'Preparing a secure upload.', 'uploading');
+
+      const request = new XMLHttpRequest();
+      activeRequest = request;
+      request.open('POST', form.action);
+      request.upload.addEventListener('progress', (event) => {
+        if (!event.lengthComputable) return;
+        const percent = Math.round((event.loaded / event.total) * 100);
+        progressFill.classList.remove('indeterminate');
+        progressFill.style.width = percent + '%';
+        progressTrack.setAttribute('aria-valuenow', String(percent));
+        statusDetail.textContent = percent + '% uploaded';
+      });
+      request.upload.addEventListener('load', () => {
+        uploadComplete = true;
+        setStatus('Video uploaded successfully. Starting analysis...', 'Analyzing your video. Examining available frames and forensic signals.', 'loading');
+      });
+      request.addEventListener('load', () => {
+        activeRequest = null;
+        if (request.status >= 200 && request.status < 300) {
+          document.open();
+          document.write(request.responseText);
+          document.close();
+          return;
+        }
+        const responseDocument = new DOMParser().parseFromString(request.responseText, 'text/html');
+        const serverError = responseDocument.querySelector('.error');
+        const message = serverError ? serverError.textContent.trim() : 'Please try again or choose another video.';
+        showError(request.status >= 500 ? 'Analysis failed.' : 'Upload could not be completed.', message);
+      });
+      request.addEventListener('error', () => {
+        activeRequest = null;
+        showError(uploadComplete ? 'Connection lost during analysis.' : 'Upload failed.', 'Check your connection, then retry or choose another video.');
+      });
+      request.addEventListener('timeout', () => {
+        activeRequest = null;
+        showError(uploadComplete ? 'Analysis timed out.' : 'Upload timed out.', 'Retry the request or choose another video.');
+      });
+      request.addEventListener('abort', () => {
+        activeRequest = null;
+        showError('Upload canceled.', 'You can retry this video or choose another one.');
+      });
+      request.timeout = 10 * 60 * 1000;
+      const body = new FormData();
+      body.append('csrf_token', document.getElementById('csrfToken').value);
+      videos.forEach((video) => body.append('video', video, video.name));
+      request.send(body);
+    }
+
+    function validateAndSubmit(fileList) {
+      const videos = Array.from(fileList || []);
+      if (!videos.length || isSubmitting) return;
+      selectedIsValid = false;
+      for (const video of videos) {
+        const extension = video.name.split('.').pop().toLowerCase();
+        if (!['mp4', 'webm', 'mov'].includes(extension)) {
+          selectedVideos = videos;
+          showError('Unsupported file type.', video.name + ' is not MP4, WebM, or MOV.');
+          return;
+        }
+        if (video.size > maxUploadBytes) {
+          selectedVideos = videos;
+          showError('Video is too large.', video.name + ' exceeds the 100 MiB per-video limit.');
+          return;
+        }
+        if (video.size === 0) {
+          selectedVideos = videos;
+          showError('This video is empty.', 'Choose another video file.');
+          return;
+        }
+      }
+      const totalSize = videos.reduce((sum, video) => sum + video.size, 0);
+      if (totalSize > maxBatchBytes) {
+        selectedVideos = videos;
+        showError('Combined upload is too large.', 'Keep the total upload below 250 MiB.');
+        return;
+      }
+      selectedIsValid = true;
+      showSelection(videos);
+    }
+
+    file.addEventListener('change', () => validateAndSubmit(file.files));
+    selectBtn.addEventListener('click', chooseFile);
+    dz.addEventListener('click', chooseFile);
+    dz.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        chooseFile();
+      }
     });
-    dz.addEventListener('click', ()=>file.click());
-    dz.addEventListener('dragover', e=>{e.preventDefault(); dz.style.borderColor='rgba(34,211,238,.8)'});
-    dz.addEventListener('dragleave', e=>{e.preventDefault(); dz.style.borderColor='rgba(255,255,255,0.12)'});
-    dz.addEventListener('drop', e=>{e.preventDefault(); dz.style.borderColor='rgba(255,255,255,0.12)'; if(e.dataTransfer.files[0]){file.files=e.dataTransfer.files; updateList();}});
+    dz.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dz.classList.add('active');
+    });
+    dz.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dz.classList.remove('active');
+    });
+    dz.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dz.classList.remove('active');
+      if (isSubmitting) return;
+      if (e.dataTransfer.files && e.dataTransfer.files.length) {
+        validateAndSubmit(e.dataTransfer.files);
+      }
+    });
+    form.addEventListener('submit', (event) => event.preventDefault());
+    retryBtn.addEventListener('click', () => submitVideos(selectedVideos));
+    replaceBtn.addEventListener('click', chooseFile);
+    cancelBtn.addEventListener('click', () => activeRequest && activeRequest.abort());
   </script>
 </body>
 </html>
+
+
